@@ -8,11 +8,12 @@
 
 
 int main(int argc, char * argv[]){
-	int pids[NUM_SLAVES]; 
-
+	
 	int num_slaves = NUM_SLAVES;
+	
 	int parent_to_child[num_slaves][2];
 	int child_to_parent[num_slaves][2];
+	int pids[num_slaves]; 
 
 	// #### creamos los pipes #### 
 	for(int i=0; i<num_slaves; i++){
@@ -41,13 +42,55 @@ int main(int argc, char * argv[]){
 	i--;
 
 
-	//  #### proceso hijo #### 
+	//  #### proceso esclavo #### 
 	if(currentId == 0){
 		// cerramos los pipes que no vamos a usar
 		close(parent_to_child[i][1]);		// no quiere escribir
 		close(child_to_parent[i][0]);		// no quiere leer
 
-		
+		char * file;
+
+		int fd[2];
+		char * arg[] = {"md5sum", NULL, NULL};
+		if(pipe(fd)==-1){
+			perror("ERROR! Pipe de slave!\n");
+			exit(3);
+		}
+		dup2(fd[1], 1);	// TODO: chequear error
+		dup2(fd[0],0);
+
+		// TODO: cerrar todos los fd que no usamos
+
+		int finished=0;
+		while(!finised){
+			// RECIBIR EL FILE PATH
+			// while(read(parent_to_child[i][0], file, ???) < 1){;
+			// TODO: esto es busy waiting? Ver como suspender ejecucion hasta que padre me mande algo
+
+			arg[2] = file;
+
+			int id = fork();
+
+			if(id==-1){
+				perror("ERROR! Pipes en esclavo!\n");
+				exit(4);
+			}
+
+			// proceso esclavo
+			if(id==0){
+				execvp("md5sum", arg);
+			}
+
+			// proceso hijo de esclavo
+			else{				
+				char salida[33] = {0};
+				while(read(0,salida, 32) < 0);
+
+				char caracter;
+				while(read(0,&caracter, 1) >1); 	//flushear la entrada TODO: ver hacerlo mas elegante
+ 				wait(NULL);
+			}		
+		}
 	}
 
 
