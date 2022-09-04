@@ -48,9 +48,8 @@ int main(int argc, char * argv[]){
 		slave_info[i].parent_to_child_write = parent_to_child[i][WRITE];
 		slave_info[i].child_to_parent_read = child_to_parent[i][READ];
 		slave_info[i].child_to_parent_write = child_to_parent[i][WRITE];
-
-
-		FD_SET(slave_info[i].child_to_parent_read, &read_fd);
+		printf("PCR: %d PCW: %d - CPR: %d CPW:%d\n",slave_info[i].parent_to_child_read, slave_info[i].parent_to_child_write,slave_info[i].child_to_parent_read,  slave_info[i].child_to_parent_write);
+		FD_SET(slave_info[i].child_to_parent_read, &read_fd);	
 	}
 
 	// #### creamos los esclavos #### 
@@ -88,6 +87,7 @@ int main(int argc, char * argv[]){
 			exit(3);
 		}
 
+		int original = dup(1);
 		// redireccionamos la entrada y salida estandard al pipe
 		dup2(fd[1], 1);	// TODO: chequear error
 		dup2(fd[0],0);
@@ -129,9 +129,11 @@ int main(int argc, char * argv[]){
 				while(read(0,&caracter, 1) >1); 	//flushear la entrada TODO: ver hacerlo mas elegante
  				wait(NULL);
 
-			
- 				write(slave_info[i].child_to_parent_write, &salida, sizeof(char *));
+ 				dup2(original, 1);
+ 				printf("Hijo manda por: %d\n", slave_info[i].child_to_parent_write);
+ 				dup2(fd[1],1);
 
+ 				write(slave_info[i].child_to_parent_write, &salida, sizeof(char *));
   			}		
 		}
 	}
@@ -139,6 +141,8 @@ int main(int argc, char * argv[]){
 
 	//  #### proceso padre #### 
 	else{
+		char * respuesta =0;
+
 		// cerramos los pipes que no vamos a usar
 		for(int j=0; j<num_slaves; j++){
 			close(slave_info[i].parent_to_child_read);		// no quiere leer 
@@ -151,29 +155,33 @@ int main(int argc, char * argv[]){
 				write(slave_info[i].parent_to_child_write, &(argv[1]), sizeof(char *)); //matado
 			}
 
-
 			//TODO: recibo la respues de ellos usando select y un ciclo de read 
-			int select_value = select(num_slaves, &read_fd, NULL, NULL, NULL);
-			if(select_value==-1){
+
+			if(select(FD_SETSIZE, &read_fd, NULL, NULL, NULL)<0){
 				perror("Select");
 				exit(5);
 			}
-			else if(select_value){
-				printf("dentro del select\n");
-				for(int i=0; i<num_slaves; i++){
-					char * respuesta;
+
+			for(int i=0; i<num_slaves; i++){
+
+				if(FD_ISSET(slave_info[i].child_to_parent_read, &read_fd)){
+
 					int read_val = read(slave_info[i].child_to_parent_read, &respuesta, sizeof(char *));
+
 					if(read_val == -1){
 						perror("Read parent");
 						exit(6);
 					}
-					else if(read_val > 0){
-						//TODO: pasar a un buffer
-						printf("Recibi del esclavo: %s\n", respuesta);
 
-						number_of_files--;
-					}
+					printf("Recibi del esclavo: %s\n", respuesta);
+					number_of_files--;
 				}
+			}
+			
+			// reseteo los fds
+			FD_ZERO(&read_fd);
+			for(int i=0; i<num_slaves; i++){
+				FD_SET(slave_info[i].child_to_parent_read, &read_fd);
 			}
 		}
 		
