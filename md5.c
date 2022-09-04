@@ -3,8 +3,10 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/select.h>
+#include <math.h>
 
-#define FILES_PER_SLAVE 5
+#define FILES_PER_SLAVE 2
 #define READ 0 
 #define WRITE 1
 
@@ -18,9 +20,11 @@ typedef struct Slave_Info{
 
 
 int main(int argc, char * argv[]){
+
+	setvbuf(stdout, NULL, _IONBF, 0);
 	
 	int number_of_files = argc-1;
-	int num_slaves = number_of_files / FILES_PER_SLAVE; // casteo??
+	int num_slaves = ceil((double)number_of_files / FILES_PER_SLAVE); // TODO: ARREGLAR ESTO
 
 	int parent_to_child[num_slaves][2];
 	int child_to_parent[num_slaves][2];
@@ -34,6 +38,9 @@ int main(int argc, char * argv[]){
 		}
 	}
 
+	fd_set read_fd;
+	FD_ZERO(&read_fd);
+
 	// le pasamos los datos al struct
 	Slave_Info slave_info[num_slaves];
 	for(int i=0; i<num_slaves; i++){
@@ -41,6 +48,9 @@ int main(int argc, char * argv[]){
 		slave_info[i].parent_to_child_write = parent_to_child[i][WRITE];
 		slave_info[i].child_to_parent_read = child_to_parent[i][READ];
 		slave_info[i].child_to_parent_write = child_to_parent[i][WRITE];
+
+
+		FD_SET(slave_info[i].child_to_parent_read, &read_fd);
 	}
 
 	// #### creamos los esclavos #### 
@@ -81,16 +91,21 @@ int main(int argc, char * argv[]){
 		// redireccionamos la entrada y salida estandard al pipe
 		dup2(fd[1], 1);	// TODO: chequear error
 		dup2(fd[0],0);
-
+		
 		// TODO: cerrar todos los fd que no usamos
 
 		int finished=0;
-		while(!finished){
-			// RECIBIR EL FILE PATH
-			// while(read(parent_to_child[i][0], file, ???) < 1){;
-			// TODO: esto es busy waiting? Ver como suspender ejecucion hasta que padre me mande algo
-			arg[2] = file;
+		char salida[33];
+		salida[32] = 0;						// null termination
 
+		while(finished==0){
+			
+
+			// RECIBIR EL FILE PATH
+			while(read(slave_info[i].parent_to_child_read, &file, sizeof(char *)) < 1);
+			// TODO: esto es busy waiting? Ver como suspender ejecucion hasta que padre me mande algo
+
+			arg[1] = file;
 
 			// #### creamos sub esclavo que va a correr el md5sum ####
 			int id = fork();
@@ -107,16 +122,17 @@ int main(int argc, char * argv[]){
 
 			// #### proceso esclavo #### 
 			else{				
-				char salida[33];
-				salida[32] = 0;				// null termination
-				while(read(0,salida, 32) < 0);		// TODO: esto se puede solucionar con semaforos o estamos forzados a hacerlo asi (en este caso)???
+
+				while(read(0, salida, 32 * sizeof(char)) < 1);		// TODO: esto se puede solucionar con semaforos o estamos forzados a hacerlo asi (en este caso)???
 
 				char caracter;
 				while(read(0,&caracter, 1) >1); 	//flushear la entrada TODO: ver hacerlo mas elegante
  				wait(NULL);
 
- 				//TODO: escribirle al viejo la respuesta 
-			}		
+			
+ 				write(slave_info[i].child_to_parent_write, &salida, sizeof(char *));
+
+  			}		
 		}
 	}
 
@@ -130,12 +146,37 @@ int main(int argc, char * argv[]){
 		}
 
 		while(number_of_files>0){
+			//TODO: un ciclo andonde mando nombre de files a esclavos
+			for(int i=0;i<num_slaves; i++){
+				write(slave_info[i].parent_to_child_write, &(argv[1]), sizeof(char *)); //matado
+			}
+
 
 			//TODO: recibo la respues de ellos usando select y un ciclo de read 
-			//select(child_to_parent)
+			int select_value = select(num_slaves, &read_fd, NULL, NULL, NULL);
+			if(select_value==-1){
+				perror("Select");
+				exit(5);
+			}
+			else if(select_value){
+				printf("dentro del select\n");
+				for(int i=0; i<num_slaves; i++){
+					char * respuesta;
+					int read_val = read(slave_info[i].child_to_parent_read, &respuesta, sizeof(char *));
+					if(read_val == -1){
+						perror("Read parent");
+						exit(6);
+					}
+					else if(read_val > 0){
+						//TODO: pasar a un buffer
+						printf("Recibi del esclavo: %s\n", respuesta);
 
+						number_of_files--;
+					}
+				}
+			}
 		}
-		//TODO: un ciclo andonde mando nombre de files a esclavos
+		
 		
 
 		// nos quedamos sin files y ya recibimos todas las

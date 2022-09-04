@@ -1,1 +1,1 @@
-gcc -Wall -std=c99 -g md5.c -o md5
+gcc -Wall -lm -std=c99 -g md5.c -o md5
