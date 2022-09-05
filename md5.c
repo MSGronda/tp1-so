@@ -9,6 +9,7 @@
 #define FILES_PER_SLAVE 2
 #define READ 0 
 #define WRITE 1
+#define MD5_SIZE 32
 
 typedef struct Slave_Info{
 	int parent_to_child_read;
@@ -38,7 +39,7 @@ int main(int argc, char * argv[]){
 		}
 	}
 
-	fd_set read_fd;
+	fd_set read_fd, backup_read_fd;
 	FD_ZERO(&read_fd);
 
 	// le pasamos los datos al struct
@@ -48,9 +49,10 @@ int main(int argc, char * argv[]){
 		slave_info[i].parent_to_child_write = parent_to_child[i][WRITE];
 		slave_info[i].child_to_parent_read = child_to_parent[i][READ];
 		slave_info[i].child_to_parent_write = child_to_parent[i][WRITE];
-		printf("PCR: %d PCW: %d - CPR: %d CPW:%d\n",slave_info[i].parent_to_child_read, slave_info[i].parent_to_child_write,slave_info[i].child_to_parent_read,  slave_info[i].child_to_parent_write);
 		FD_SET(slave_info[i].child_to_parent_read, &read_fd);	
 	}
+
+	backup_read_fd = read_fd;
 
 	// #### creamos los esclavos #### 
 	int i, currentId=1;
@@ -95,17 +97,13 @@ int main(int argc, char * argv[]){
 		// TODO: cerrar todos los fd que no usamos
 
 		int finished=0;
-		char salida[33];
-		salida[32] = 0;						// null termination
+		char salida[MD5_SIZE + 1]= {0};
 
 		while(finished==0){
 			
-
-			// RECIBIR EL FILE PATH
-			while(read(slave_info[i].parent_to_child_read, &file, sizeof(char *)) < 1);
-			// TODO: esto es busy waiting? Ver como suspender ejecucion hasta que padre me mande algo
-
-			arg[1] = file;
+			// leemos lo que le mando
+			while(read(slave_info[i].parent_to_child_read, &file, sizeof(char *)) < 1);			
+			//TODO: encontrar forma de hacer esto correctamente!!!!!!!!
 
 			// #### creamos sub esclavo que va a correr el md5sum ####
 			int id = fork();
@@ -116,6 +114,7 @@ int main(int argc, char * argv[]){
 
 			// #### proceso subesclavo #### 
 			if(id==0){
+				arg[1] = file;			//le pasamos como argumento el nombre del file
 				execvp("md5sum", arg);
 			}
 
@@ -123,17 +122,20 @@ int main(int argc, char * argv[]){
 			// #### proceso esclavo #### 
 			else{				
 
-				while(read(0, salida, 32 * sizeof(char)) < 1);		// TODO: esto se puede solucionar con semaforos o estamos forzados a hacerlo asi (en este caso)???
+				while(read(0, salida, MD5_SIZE * sizeof(char)) < 1);		// TODO: esto se puede solucionar con semaforos o estamos forzados a hacerlo asi (en este caso)???
 
-				char caracter;
-				while(read(0,&caracter, 1) >1); 	//flushear la entrada TODO: ver hacerlo mas elegante
- 				wait(NULL);
+				// flusheamos la entrada estandar 
+				int c;
+				while ((c = getchar()) != '\n' && c != EOF);
+
+				// lo esperamos al subesclavo 
+				wait(NULL);
 
  				dup2(original, 1);
- 				printf("Hijo manda por: %d\n", slave_info[i].child_to_parent_write);
+ 				printf("\tHijo i=%d manda: %s -> %s\n\n",i, file,salida);
  				dup2(fd[1],1);
 
- 				write(slave_info[i].child_to_parent_write, &salida, sizeof(char *));
+ 				write(slave_info[i].child_to_parent_write, salida, MD5_SIZE*sizeof(char));
   			}		
 		}
 	}
@@ -141,50 +143,63 @@ int main(int argc, char * argv[]){
 
 	//  #### proceso padre #### 
 	else{
-		char * respuesta =0;
+		char respuesta[MD5_SIZE + 1]= {0};
+		int current_file_sent = 1, current_file_read = 0;				// ignoramos el primer file que es el nombre del ejecutable
+
 
 		// cerramos los pipes que no vamos a usar
 		for(int j=0; j<num_slaves; j++){
-			close(slave_info[i].parent_to_child_read);		// no quiere leer 
-			close(slave_info[i].child_to_parent_write);		// no quiere escribir
+			close(slave_info[j].parent_to_child_read);		// no quiere leer 
+			close(slave_info[j].child_to_parent_write);		// no quiere escribir
 		}
 
-		while(number_of_files>0){
-			//TODO: un ciclo andonde mando nombre de files a esclavos
-			for(int i=0;i<num_slaves; i++){
-				write(slave_info[i].parent_to_child_write, &(argv[1]), sizeof(char *)); //matado
-			}
+		// Le pasamos inicialmente a todos los esclavos
+		for(int i=0 ; current_file_sent<num_slaves; i++, current_file_sent++){
+			write(slave_info[i].parent_to_child_write, &(argv[current_file_sent]), sizeof(char *));
+		}
 
-			//TODO: recibo la respues de ellos usando select y un ciclo de read 
+		// recibimos y mandamos files hasta que no queden mas para procesar
+		while(current_file_read < number_of_files){
 
 			if(select(FD_SETSIZE, &read_fd, NULL, NULL, NULL)<0){
 				perror("Select");
 				exit(5);
 			}
 
-			for(int i=0; i<num_slaves; i++){
+			for(int i=0; i<num_slaves && current_file_read < number_of_files; i++){
 
 				if(FD_ISSET(slave_info[i].child_to_parent_read, &read_fd)){
 
-					int read_val = read(slave_info[i].child_to_parent_read, &respuesta, sizeof(char *));
+					int read_val = read(slave_info[i].child_to_parent_read, respuesta, MD5_SIZE*sizeof(char));
+					current_file_read++;
 
 					if(read_val == -1){
 						perror("Read parent");
 						exit(6);
 					}
 
-					printf("Recibi del esclavo: %s\n", respuesta);
-					number_of_files--;
+					printf("Recibi de i=%d, n=%d : %s\n\n", i, read_val,respuesta);
+
+
+					// TODO: escribir al buffer de respuestas
+
+
+					// ya que termino de procesar el archivo, le pasamos uno nuevo
+					write(slave_info[i].parent_to_child_write, &(argv[++current_file_sent]), sizeof(char *));	
 				}
 			}
-			
-			// reseteo los fds
-			FD_ZERO(&read_fd);
-			for(int i=0; i<num_slaves; i++){
-				FD_SET(slave_info[i].child_to_parent_read, &read_fd);
-			}
+
+			// restauramos los fds a los originales
+			read_fd = backup_read_fd;
 		}
+
+		printf("Cerrado el ciclo original\n");
 		
+		// una vez que procesamos todo, cerramos por completo los pipes
+		for(int j=0; j<num_slaves; j++){
+			close(slave_info[j].parent_to_child_write);
+			close(slave_info[j].child_to_parent_read);
+		}
 		
 
 		// nos quedamos sin files y ya recibimos todas las
