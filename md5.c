@@ -144,7 +144,7 @@ int main(int argc, char * argv[]){
 	//  #### proceso padre #### 
 	else{
 		char respuesta[MD5_SIZE + 1]= {0};
-		int current_file_sent = 1, current_file_read = 0;				// ignoramos el primer file que es el nombre del ejecutable
+		int current_file_sent = 0, current_file_read = 0;				// ignoramos el primer file que es el nombre del ejecutable
 
 
 		// cerramos los pipes que no vamos a usar
@@ -165,6 +165,8 @@ int main(int argc, char * argv[]){
 				perror("Select");
 				exit(5);
 			}
+			
+			// TODO: refactoring de la logica de current_file_read/write (!!!) 
 
 			for(int i=0; i<num_slaves && current_file_read < number_of_files; i++){
 
@@ -178,14 +180,16 @@ int main(int argc, char * argv[]){
 						exit(6);
 					}
 
-					printf("Recibi de i=%d, n=%d : %s\n\n", i, read_val,respuesta);
-
-
 					// TODO: escribir al buffer de respuestas
 
 
 					// ya que termino de procesar el archivo, le pasamos uno nuevo
-					write(slave_info[i].parent_to_child_write, &(argv[++current_file_sent]), sizeof(char *));	
+					
+					if(current_file_sent < number_of_files ){
+						printf("Mande a i=%d: %s\n\n", i, argv[current_file_sent]);
+						write(slave_info[i].parent_to_child_write, &(argv[current_file_sent++]), sizeof(char *));	
+					}
+					
 				}
 			}
 
@@ -193,7 +197,7 @@ int main(int argc, char * argv[]){
 			read_fd = backup_read_fd;
 		}
 
-		printf("Cerrado el ciclo original\n");
+		printf("-=-=-=Cerrado el ciclo original=-=-=-\n");
 		
 		// una vez que procesamos todo, cerramos por completo los pipes
 		for(int j=0; j<num_slaves; j++){
