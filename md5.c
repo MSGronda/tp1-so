@@ -1,85 +1,73 @@
 #define _POSIX_SOURCE
 
+#include <math.h>
 #include <stdio.h>
+#include <signal.h>
 #include <stdlib.h>
-#include <unistd.h>
+#include <sys/select.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <sys/select.h>
-#include <math.h>
-#include <signal.h>
+#include <unistd.h>
 
 #define FILES_PER_SLAVE 2
-#define READ 0 
-#define WRITE 1
 #define MD5_SIZE 32
 
-typedef struct Slave_Info{
-	int parent_to_child_read;
-	int parent_to_child_write;
-	int child_to_parent_read;
-	int child_to_parent_write;
+#define READ 0 
+#define WRITE 1
+
+struct slave_info {
+	int app_to_slave[2];
+	int slave_to_app[2];
+
 	int pid;
-}Slave_Info;
+};
 
 
-int main(int argc, char * argv[]){
-
+int 
+main(int argc, char * argv[])
+{
 	setvbuf(stdout, NULL, _IONBF, 0);
 	
-	int number_of_files = argc-1;
-	int num_slaves = ceil((double)number_of_files / FILES_PER_SLAVE); // TODO: ARREGLAR ESTO
+	int num_files = argc - 1;
+	int num_slaves = ceil((double) num_files / FILES_PER_SLAVE); // TODO: ARREGLAR ESTO
 
-	int parent_to_child[num_slaves][2];
-	int child_to_parent[num_slaves][2];
+        struct slave_info slaves[num_slaves];
 	
-	// #### creamos los pipes #### 
-	for(int i=0; i<num_slaves; i++){
-		// fd[0] = read  | fd[1] = write
-		if(pipe(parent_to_child[i]) == -1 || pipe(child_to_parent[i]) == -1){
-			perror("ERROR! Pipes!\n");
-			exit(2);
-		}
-	}
-
 	fd_set read_fd, backup_read_fd;
 	FD_ZERO(&read_fd);
 
-	// le pasamos los datos al struct
-	Slave_Info slave_info[num_slaves];
-	for(int i=0; i<num_slaves; i++){
-		slave_info[i].parent_to_child_read = parent_to_child[i][READ];
-		slave_info[i].parent_to_child_write = parent_to_child[i][WRITE];
-		slave_info[i].child_to_parent_read = child_to_parent[i][READ];
-		slave_info[i].child_to_parent_write = child_to_parent[i][WRITE];
-		FD_SET(slave_info[i].child_to_parent_read, &read_fd);	
-	}
+	// #### creamos los pipes #### 
+	for(int i=0; i < num_slaves; i++){
+		if(pipe(slaves[i].app_to_slave) == -1 || pipe(slaves[i].slave_to_app) == -1) {
+			perror("ERROR! Pipes!\n");
+			exit(2);
+		}
 
+		FD_SET(slaves[i].slave_to_app[READ], &read_fd);	
+	}
 	backup_read_fd = read_fd;
 
 	// #### creamos los esclavos #### 
-	int i, currentId=1;
-	for(i=0; i<num_slaves && currentId!=0 ;i++){
-		currentId = fork();
-
+	int curr_slave, currentId = 1;
+	for(curr_slave = 0; curr_slave < num_slaves && currentId != 0 ; curr_slave++) {
 		// cheque de error
-		if(currentId == -1){
+		if((currentId = fork()) == -1){
 			perror("ERROR! Fork!\n");
 			exit(1);
 		}
 
-		slave_info[i].pid = currentId;
+		slaves[curr_slave].pid = currentId;
 	}
 
 	// #### TODO: hacerlo mas lindo #### 
-	i--;
+	curr_slave--;
 
 
 	//  #### proceso esclavo #### 
 	if(currentId == 0){
 		// cerramos los pipes que no vamos a usar
-		close(slave_info[i].parent_to_child_write);
-		close(slave_info[i].child_to_parent_read);
+		close(slaves[curr_slave].app_to_slave[WRITE]);
+		close(slaves[curr_slave].slave_to_app[READ]);
 
 		// variables
 		char * file;
@@ -105,7 +93,7 @@ int main(int argc, char * argv[]){
 		while(finished==0){
 			
 			// leemos lo que le mando
-			while(read(slave_info[i].parent_to_child_read, &file, sizeof(char *)) < 1);			
+			while(read(slaves[curr_slave].app_to_slave[READ], &file, sizeof(char *)) < 1);			
 			//TODO: encontrar forma de hacer esto correctamente!!!!!!!!
 
 			// #### creamos sub esclavo que va a correr el md5sum ####
@@ -135,10 +123,10 @@ int main(int argc, char * argv[]){
 				wait(NULL);
 
  				dup2(original, 1);
- 				printf("\tHijo i=%d manda: %s -> %s\n\n",i, file,salida);
+ 				printf("\tHijo i=%d manda: %s -> %s\n\n",curr_slave, file,salida);
  				dup2(fd[1],1);
 
- 				write(slave_info[i].child_to_parent_write, salida, MD5_SIZE*sizeof(char));
+ 				write(slaves[curr_slave].slave_to_app[WRITE], salida, MD5_SIZE*sizeof(char));
   			}		
 		}
 	}
@@ -152,17 +140,17 @@ int main(int argc, char * argv[]){
 
 		// cerramos los pipes que no vamos a usar
 		for(int j=0; j<num_slaves; j++){
-			close(slave_info[j].parent_to_child_read);		// no quiere leer 
-			close(slave_info[j].child_to_parent_write);		// no quiere escribir
+			close(slaves[j].app_to_slave[READ]);		// no quiere leer 
+			close(slaves[j].slave_to_app[WRITE]);		// no quiere escribir
 		}
 
 		// Le pasamos inicialmente a todos los esclavos
 		for(int i=0 ; current_file_sent<num_slaves; i++, current_file_sent++){
-			write(slave_info[i].parent_to_child_write, &(argv[current_file_sent]), sizeof(char *));
+			write(slaves[i].app_to_slave[WRITE], &(argv[current_file_sent]), sizeof(char *));
 		}
 
 		// recibimos y mandamos files hasta que no queden mas para procesar
-		while(current_file_read < number_of_files){
+		while(current_file_read < num_files){
 
 			if(select(FD_SETSIZE, &read_fd, NULL, NULL, NULL)<0){
 				perror("Select");
@@ -170,11 +158,11 @@ int main(int argc, char * argv[]){
 			}
 
 			// 
-			for(int i=0; i<num_slaves && current_file_read < number_of_files ; i++){
+			for(int i=0; i<num_slaves && current_file_read < num_files ; i++){
 
-				if(FD_ISSET(slave_info[i].child_to_parent_read, &read_fd)){
+				if(FD_ISSET(slaves[i].slave_to_app[READ], &read_fd)){
 
-					int read_val = read(slave_info[i].child_to_parent_read, respuesta, MD5_SIZE*sizeof(char));
+					int read_val = read(slaves[i].slave_to_app[READ], respuesta, MD5_SIZE*sizeof(char));
 					current_file_read++;
 
 					if(read_val == -1){
@@ -191,8 +179,8 @@ int main(int argc, char * argv[]){
 
 					// ya que termino de procesar el archivo, le pasamos uno nuevo
 					// pero solo si quedan cosas para mandar
-					if(current_file_sent < number_of_files)
-						write(slave_info[i].parent_to_child_write, &(argv[current_file_sent]), sizeof(char *));
+					if(current_file_sent < num_files)
+						write(slaves[i].app_to_slave[WRITE], &(argv[current_file_sent]), sizeof(char *));
 						current_file_sent++;	
 				}
 			}
@@ -205,11 +193,11 @@ int main(int argc, char * argv[]){
 		
 		// una vez que procesamos todo, cerramos por completo los pipes
 		for(int j=0; j<num_slaves; j++){
-			close(slave_info[j].parent_to_child_write);
-			close(slave_info[j].child_to_parent_read);
+			close(slaves[j].app_to_slave[WRITE]);
+			close(slaves[j].slave_to_app[READ]);
 
 			// TODO: matar al hijo pero de manera linda
-			kill(slave_info[j].pid, SIGKILL);
+			kill(slaves[j].pid, SIGKILL);
 		}
 		
 
