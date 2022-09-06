@@ -1,3 +1,5 @@
+#define _POSIX_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -5,6 +7,7 @@
 #include <sys/wait.h>
 #include <sys/select.h>
 #include <math.h>
+#include <signal.h>
 
 #define FILES_PER_SLAVE 2
 #define READ 0 
@@ -165,10 +168,9 @@ int main(int argc, char * argv[]){
 				perror("Select");
 				exit(5);
 			}
-			
-			// TODO: refactoring de la logica de current_file_read/write (!!!) 
 
-			for(int i=0; i<num_slaves && current_file_read < number_of_files; i++){
+			// 
+			for(int i=0; i<num_slaves && current_file_read < number_of_files ; i++){
 
 				if(FD_ISSET(slave_info[i].child_to_parent_read, &read_fd)){
 
@@ -180,16 +182,18 @@ int main(int argc, char * argv[]){
 						exit(6);
 					}
 
+
+					printf("Recibi de i=%d, n=%d : %s\n\n", i, read_val,respuesta);
+
+
 					// TODO: escribir al buffer de respuestas
 
 
 					// ya que termino de procesar el archivo, le pasamos uno nuevo
-					
-					if(current_file_sent < number_of_files ){
-						printf("Mande a i=%d: %s\n\n", i, argv[current_file_sent]);
-						write(slave_info[i].parent_to_child_write, &(argv[current_file_sent++]), sizeof(char *));	
-					}
-					
+					// pero solo si quedan cosas para mandar
+					if(current_file_sent < number_of_files)
+						write(slave_info[i].parent_to_child_write, &(argv[current_file_sent]), sizeof(char *));
+						current_file_sent++;	
 				}
 			}
 
@@ -197,20 +201,18 @@ int main(int argc, char * argv[]){
 			read_fd = backup_read_fd;
 		}
 
-		printf("-=-=-=Cerrado el ciclo original=-=-=-\n");
+		printf("Cerrado el ciclo original\n");
 		
 		// una vez que procesamos todo, cerramos por completo los pipes
 		for(int j=0; j<num_slaves; j++){
 			close(slave_info[j].parent_to_child_write);
 			close(slave_info[j].child_to_parent_read);
+
+			// TODO: matar al hijo pero de manera linda
+			kill(slave_info[j].pid, SIGKILL);
 		}
 		
 
-		// nos quedamos sin files y ya recibimos todas las
-		// esperamos a todos los esclavos 
-		for(int j=0; j<num_slaves; ){
-			if(wait(NULL)>0)
-				j++;
-		}
+		printf("Matamos todos los hijos?\n");
 	}
 }
