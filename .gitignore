@@ -50,5 +50,12 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# This project
 md5
-md5
+
+#PVS-Studio
+PVS-Studio.log
+analyze.sh
+report.tasks
+strace_out
