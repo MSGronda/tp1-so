@@ -1,4 +1,7 @@
 #define _POSIX_SOURCE
+#define _BSD_SOURCE 
+#define _XOPEN_SOURCE 501
+
 
 #include <math.h>
 #include <signal.h>
@@ -8,12 +11,21 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <string.h>
+#include <semaphore.h>
 
 #define FILES_PER_SLAVE 2
 #define MD5_SIZE 32
+#define MAX_NAME_LENGTH 100
 
 #define READ 0 
 #define WRITE 1
+
+#define SHARED_MEMORY_NAME "md5_shm"
+#define SEMAPHORE_NAME "md5_sem"
 
 // Error codes
 #define ERROR_CREATING_SLAVE_PIPES 1
@@ -32,22 +44,64 @@
 #define ERROR_CLOSING_FINAL_PIPES 14
 
 // Contains data relating to each slave
-struct slave_info {
+typedef struct slave_info {
 	int app_to_slave[2];
 	int slave_to_app[2];
 	int pid;
-};
+	char * prev_file_name;
+}slave_info;
+
+
+typedef struct hash_info{
+	int pid;
+	char hash[MD5_SIZE + 1];
+	char file_name[MAX_NAME_LENGTH];	
+}hash_info;
+
 
 
 int main(int argc, char * argv[]){
 
 	// Turning off print buffering
 	setvbuf(stdout, NULL, _IONBF, 0);
-	
+
 	int num_files = argc - 1;
 	int num_slaves = ceil((double) num_files / FILES_PER_SLAVE); // TODO: ARREGLAR ESTO
 
-	struct slave_info slaves[num_slaves];
+	//TODO: handle que no me pasen ningun file
+
+	// Create shared memory 
+	int shm_fd = shm_open(SHARED_MEMORY_NAME, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR);
+	if(shm_fd == -1){
+		perror("Creating shared memory");
+		exit(1912931);
+	}
+
+	if(ftruncate(shm_fd, 3000) == -1){
+		perror("Truncating shared memory");
+		exit(1912931);
+	}
+	if( mmap(NULL, 3000, PROT_READ|PROT_WRITE, MAP_SHARED, shm_fd, 0) == MAP_FAILED ){
+		perror("Mapping shared memory");
+		exit(1912931);
+	}
+
+	// Create semaphore for shared memory
+	sem_t * sem_smh = sem_open(SEMAPHORE_NAME,  O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0);
+	if( sem_smh == SEM_FAILED){
+		perror("Creating semaphore");
+		exit(34554);
+	}
+
+	// Broadcast shared memory address
+	printf(SHARED_MEMORY_NAME);
+	
+	// Broadcast sempaphore
+	printf(SEMAPHORE_NAME);
+
+	sleep(2);
+
+	slave_info slaves[num_slaves];
 	
 	// Grouping all slave to app read fds
 	fd_set read_fd, backup_read_fd;
@@ -146,7 +200,7 @@ int main(int argc, char * argv[]){
 				exit(ERROR_CREATING_SUBSLAVE);
 			}
 
-			/* SUBSLAVE: Who's job is to execute md5sum */
+			/* SUBSLAVE: Whose job is to execute md5sum */
 			if(id == 0) {
 				args[1] = file;	// arg will be filename		
 				execvp("md5sum", args);
@@ -186,10 +240,9 @@ int main(int argc, char * argv[]){
 		}
 	}
         /* APP */
-	else
-        {
+	else{
 		char ans[MD5_SIZE + 1]= {0};
-		int curr_files_sent = 1, curr_files_read = 0;	// Ignore first file bc it is the executable's name
+		int curr_files_sent = 1, curr_files_read = 0, curr_files_shm = 0;	// Ignore first file bc it is the executable's name
 
 		// Close useless pipes
 		for(int i = 0; i < num_slaves; i++) {
@@ -200,8 +253,10 @@ int main(int argc, char * argv[]){
 		}
 
 		// Initial distribution of files to slaves
-		for(int i = 0; curr_files_sent < num_slaves; i++, curr_files_sent++)
+		for(int i = 0; curr_files_sent < num_slaves; i++, curr_files_sent++){
 			write(slaves[i].app_to_slave[WRITE], &(argv[curr_files_sent]), sizeof(char *));
+			slaves[i].prev_file_name = argv[curr_files_sent];
+		}
 
 		// Send files until there are no more to process
 		while(curr_files_read < num_files) {
@@ -226,11 +281,22 @@ int main(int argc, char * argv[]){
 
 					printf("Recibi de i=%d : %s\n\n", i ,ans);
 
-					// TODO: escribir al buffer de ans
+					// Create structure to write to shared memory
+					hash_info hash;
+					hash.pid = slaves[i].pid;
+					strcpy(hash.hash, ans);
+					strcpy(hash.file_name, slaves[i].prev_file_name);  
+
+					// Write to shared memory using an offset
+					pwrite(shm_fd, &hash, sizeof(hash_info), curr_files_shm * sizeof(hash_info));
+					curr_files_shm++;
+					sem_post(sem_smh);
+
 
 					// Send new files if there are any left
 					if(curr_files_sent <= num_files){
 						write(slaves[i].app_to_slave[WRITE], &(argv[curr_files_sent]), sizeof(char *));
+						slaves[i].prev_file_name = argv[curr_files_sent];
 						curr_files_sent++;
 					}
 				}
