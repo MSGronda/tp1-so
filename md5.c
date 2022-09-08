@@ -52,15 +52,16 @@ int main(int argc, char * argv[]){
 
 	// Create shared memory 
 	int shm_fd;
-	ERROR_CHECK_KEEP(shm_open(SHARED_MEMORY_NAME, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR), shm_fd, -1, "Creating shared memory", 1912931)
+	ERROR_CHECK_KEEP(shm_open(SHARED_MEMORY_NAME, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR), shm_fd, -1, "Creating shared memory", ERROR_CREATING_SHM)
 
-	ERROR_CHECK(ftruncate(shm_fd, 3000), -1, "Truncating shared memory", 1912931);
+	ERROR_CHECK(ftruncate(shm_fd, 3000), -1, "Truncating shared memory", ERROR_TRUNCATE_SHM);
 
-	ERROR_CHECK(mmap(NULL, 3000, PROT_READ|PROT_WRITE, MAP_SHARED, shm_fd, 0), MAP_FAILED, "Mapping shared memory", 1912931)
+	void * mmap_addr;
+	ERROR_CHECK_KEEP(mmap(NULL, 3000, PROT_READ|PROT_WRITE, MAP_SHARED, shm_fd, 0),mmap_addr, MAP_FAILED, "Mapping shared memory", ERROR_MAPPING_SHM)
 
 	// Create semaphore for shared memory
 	sem_t * sem_smh;
-	ERROR_CHECK_KEEP(sem_open(SEMAPHORE_NAME,  O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0), sem_smh, SEM_FAILED, "Creating semaphore", 34554)
+	ERROR_CHECK_KEEP(sem_open(SEMAPHORE_NAME,  O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0), sem_smh, SEM_FAILED, "Creating semaphore", ERROR_CREATING_SEM)
 
 	// Broadcast shared memory address
 	printf(SHARED_MEMORY_NAME);
@@ -251,9 +252,18 @@ int main(int argc, char * argv[]){
             kill(slaves[i].pid, SIGKILL);
 		}
 		
-
 		printf("Matamos todos los hijos?\n");
+		
 	}
 
-        return 0;
+	// // Unmapping an closing of shared memory
+	// ERROR_CHECK( munmap(mmap_addr, 3000), -1, "Unmapping shared memory", ERROR_UNMAPPING_SHM)
+	// ERROR_CHECK( shm_unlink(SHARED_MEMORY_NAME), -1, "Unlinking shared memory",ERROR_UNLINKING_SHM )
+	// ERROR_CHECK(close(shm_fd), -1, "Closing shared memory", ERROR_CLOSING_SHM)
+
+	// // Closing semaphore
+	// ERROR_CHECK(sem_close(sem_smh), -1, "Closing semaphore", ERROR_CLOSING_SEM)
+
+
+    return 0;
 }
