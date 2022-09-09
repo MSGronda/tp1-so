@@ -1,4 +1,5 @@
 #include "md5.h"
+#include "defs.h"
 
 /* CONSTANTS */
 
@@ -10,24 +11,6 @@
 #define SHARED_MEMORY_NAME "md5_shm"
 #define SEMAPHORE_NAME "md5_sem"
 
-
-/* MACROS */
-
-// If function returns an error, execution is ended
-#define ERROR_CHECK(func, error_value, error_msg, exit_value) 	if( (func) == (error_value) ){ 	\
-																	perror((error_msg)); 		\
-																	exit((exit_value));			\
-																}
-// If either of the two functios returns an error, execution is ended
-#define D_ERROR_CHECK(func1, func2, error_value, error_msg, exit_value) 	if( ((func1) == (error_value)) || ((func2) == (error_value))){ 	\
-																				perror((error_msg)); 		\
-																				exit((exit_value));			\
-																			}
-// Stores return value and checks if it is an error, if so, execution is ended
-#define ERROR_CHECK_KEEP(func, value, error_value, error_msg, exit_value) if(((value) = (func)) == error_value){ \
-																				perror(error_msg); \
-																				exit(exit_value); \
-																			}
 /* TYPEDEFS */
 
 // Contains data relating to each slave
@@ -39,16 +22,24 @@ typedef struct slave_info {
 }slave_info;
 
 
+/* PROTOTYPE */
+int slave(int * app_to_slave, int * slave_to_app);
+
+
+
+
 
 int main(int argc, char * argv[]){
+	
+	if(argc <= 1){
+		return NO_FILES_FOUND;
+	}
 
 	// Turning off print buffering
 	setvbuf(stdout, NULL, _IONBF, 0);
 
-	int num_files = argc - 1
-;	int num_slaves = ceil((double) num_files / FILES_PER_SLAVE); // TODO: ARREGLAR ESTO
-
-	//TODO: handle que no me pasen ningun file
+	int num_files = argc - 1;
+	int num_slaves = ceil((double) num_files / FILES_PER_SLAVE); // TODO: ARREGLAR ESTO
 
 	// Create shared memory 
 	int shm_fd;
@@ -64,18 +55,21 @@ int main(int argc, char * argv[]){
 	ERROR_CHECK_KEEP(sem_open(SEMAPHORE_NAME,  O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0), sem_smh, SEM_FAILED, "Creating semaphore", ERROR_CREATING_SEM)
 
 	// Broadcast shared memory address
-	printf(SHARED_MEMORY_NAME);
-	
+	printf("%s\n", SHARED_MEMORY_NAME);
+
 	// Broadcast sempaphore
-	printf(SEMAPHORE_NAME);
+	printf("%s\n", SEMAPHORE_NAME);
+
 
 	sleep(2);
 
 	slave_info slaves[num_slaves];
+
 	
 	// Grouping all slave to app read fds
 	fd_set read_fd, backup_read_fd;
 	FD_ZERO(&read_fd);
+
 
 	// Create pipes
 	for(int i=0; i < num_slaves; i++){
@@ -84,6 +78,7 @@ int main(int argc, char * argv[]){
 		FD_SET(slaves[i].slave_to_app[READ], &read_fd);
 	}
 	backup_read_fd = read_fd;
+
 
 	// Create slaves
 	int curr_slave, curr_id = 1;
@@ -97,90 +92,11 @@ int main(int argc, char * argv[]){
 
 
 	/* SLAVE */
-	if(curr_id == 0)
-        {
-		// Close useless pipes
-		D_ERROR_CHECK(close(slaves[curr_slave].app_to_slave[WRITE]), close(slaves[curr_slave].slave_to_app[READ]),
-		 -1, "Closing useless pipes in slave", ERROR_CLOSING_SLAVE_PIPES)
-
-		int fd[2];
-		char * args[] = { "md5sum", NULL, NULL };	// 2nd arg will be path received from APP
-
-        // Pipe connecting stdout (of subslave) to stdin (of slave)
-        ERROR_CHECK(pipe(fd), -1, "Creating pipe in slave",ERROR_CREATING_SUBSLAVE_PIPES);
-		
-		int original = dup(1);		// #### REMOVE ####
-		// Redirect IO to pipe
-        D_ERROR_CHECK(dup2(fd[READ],0), dup2(fd[WRITE], 1), -1, "Rediecting IO pipe to slave", ERROR_SETTING_SUBSLAVE_PIPES)
-
-		// TODO: cerrar todos los fd que no usamos
-                
-		
-		int finished = 0;					
-		char * file;						// file name 
-		char output[MD5_SIZE + 1]= {0};		// calculated hash for file 
-
-
-		// Read end of pipe between app and slave
-		fd_set slave_read_fd, backup_slave_read_fd;
-		FD_ZERO(&slave_read_fd);
-		FD_SET(slaves[curr_slave].app_to_slave[READ], &slave_read_fd);
-		backup_slave_read_fd = slave_read_fd;
-
-
-		// Read end pipe from subslave to slave 
-		fd_set subslave_read_fd, backup_subslave_read_fd;
-		FD_ZERO(&subslave_read_fd);
-		FD_SET(0, &subslave_read_fd);					//TODO: remplazar el 0 con un define
-		backup_subslave_read_fd = subslave_read_fd;
-
-		while(!finished) {
-
-            // Wait until father sends something through pipe
-			ERROR_CHECK(select(FD_SETSIZE, &slave_read_fd, NULL, NULL, NULL), -1, "Select in slave for reading pipe from app.",ERROR_SELECT_SLAVE)
-
-			slave_read_fd = backup_slave_read_fd;		// Backup to previous state
-
-			// Read what app sent
-			ERROR_CHECK(read(slaves[curr_slave].app_to_slave[READ], &file, sizeof(char *)), -1,"Reading answer from sublsave.",  ERROR_SELECT_APP_TO_SLAVE)				
-
-			int id;
-			ERROR_CHECK_KEEP(fork(),id, -1, "Forking subslave", ERROR_CREATING_SUBSLAVE)
-
-			/* SUBSLAVE: Whose job is to execute md5sum */
-			if(id == 0) {
-				args[1] = file;	// arg will be filename		
-				execvp("md5sum", args);
-			}
-			
-
-			/* SLAVE */
-			else {
-
-				// Wait until subslave sends something through pipe
-				ERROR_CHECK(select(FD_SETSIZE, &subslave_read_fd, NULL, NULL, NULL), -1, "Select in slave for reading pipe from app.", ERROR_SELECT_SUBSLAVE)
-				subslave_read_fd = backup_subslave_read_fd;		// Backup to previous state
-
-				// Read md5 hash
-				ERROR_CHECK(read(0, output, MD5_SIZE * sizeof(char)), -1, "Reading answer from sublsave.", ERROR_READ_SUBSLAVE_PIPE)		
-
-				// Flush stdin
-				int dump;
-				while ((dump = getchar()) != '\n' && dump != EOF);
-
-				wait(NULL); // Wait for subslave
-
-				// #### REMOVE ####
- 				dup2(original, 1);
- 				printf("\tHijo i=%d manda: %s -> %s\n\n",curr_slave, file,output);
- 				dup2(fd[1],1);
-
- 				// Write md5 hash to pipe that goes to app 
- 				//TODO: chequeo de error
- 				write(slaves[curr_slave].slave_to_app[WRITE], output, MD5_SIZE*sizeof(char));
-  			}		
-		}
+	if(curr_id == 0){
+        slave(slaves[curr_slave].app_to_slave, slaves[curr_slave].slave_to_app);
 	}
+
+	
         /* APP */
 	else{
 		char ans[MD5_SIZE + 1]= {0};
@@ -213,8 +129,6 @@ int main(int argc, char * argv[]){
 					ERROR_CHECK(read(slaves[i].slave_to_app[READ], ans, MD5_SIZE*sizeof(char)), -1, "Read in app", ERROR_READ_SLAVE_PIPE )
 					curr_files_read++;
 
-					printf("Recibi de i=%d : %s\n\n", i ,ans);
-
 					//TODO: chequeo de errores en todas las funciones de abajo
 
 					// Create structure to write to shared memory
@@ -241,8 +155,6 @@ int main(int argc, char * argv[]){
 			// Restore fds because select is destructive
 			read_fd = backup_read_fd;
 		}
-
-		printf("Cerrado el ciclo original\n");
 		
 		// Finished processing, closing pipes and killing slaves
 		for(int i = 0; i < num_slaves; i++){
@@ -251,8 +163,6 @@ int main(int argc, char * argv[]){
             // TODO: matar al hijo pero de manera linda
             kill(slaves[i].pid, SIGKILL);
 		}
-		
-		printf("Matamos todos los hijos?\n");
 		
 	}
 
@@ -264,6 +174,84 @@ int main(int argc, char * argv[]){
 	// // Closing semaphore
 	// ERROR_CHECK(sem_close(sem_smh), -1, "Closing semaphore", ERROR_CLOSING_SEM)
 
-
     return 0;
+}
+
+
+int slave(int * app_to_slave, int * slave_to_app){
+	// Close useless pipes
+	D_ERROR_CHECK(close(app_to_slave[WRITE]), close(slave_to_app[READ]),-1, "Closing useless pipes in slave", ERROR_CLOSING_SLAVE_PIPES)
+
+	int fd[2];
+	char * args[] = { "md5sum", NULL, NULL };	// 2nd arg will be path received from APP
+
+    // Pipe connecting stdout (of subslave) to stdin (of slave)
+    ERROR_CHECK(pipe(fd), -1, "Creating pipe in slave",ERROR_CREATING_SUBSLAVE_PIPES);
+	
+	// Redirect IO to pipe
+    D_ERROR_CHECK(dup2(fd[READ],0), dup2(fd[WRITE], 1), -1, "Rediecting IO pipe to slave", ERROR_SETTING_SUBSLAVE_PIPES)
+
+	// TODO: cerrar todos los fd que no usamos
+	
+	int finished = 0;					
+	char * file_name;
+	char output[MD5_SIZE + 1]= {0};		// calculated hash for file 
+
+
+	// Read end of pipe between app and slave
+	fd_set slave_read_fd, backup_slave_read_fd;
+	FD_ZERO(&slave_read_fd);
+	FD_SET(app_to_slave[READ], &slave_read_fd);
+	backup_slave_read_fd = slave_read_fd;
+
+
+	// Read end pipe from subslave to slave 
+	fd_set subslave_read_fd, backup_subslave_read_fd;
+	FD_ZERO(&subslave_read_fd);
+	FD_SET(0, &subslave_read_fd);					//TODO: remplazar el 0 con un define
+	backup_subslave_read_fd = subslave_read_fd;
+
+	while(!finished) {
+
+        // Wait until father sends something through pipe
+		ERROR_CHECK(select(FD_SETSIZE, &slave_read_fd, NULL, NULL, NULL), -1, "Select in slave for reading pipe from app.",ERROR_SELECT_SLAVE)
+
+		slave_read_fd = backup_slave_read_fd;		// Backup to previous state
+
+		// Read what app sent
+		ERROR_CHECK(read(app_to_slave[READ], &file_name, sizeof(char *)), -1,"Reading answer from sublsave.",  ERROR_SELECT_APP_TO_SLAVE)				
+
+		int id;
+		ERROR_CHECK_KEEP(fork(),id, -1, "Forking subslave", ERROR_CREATING_SUBSLAVE)
+
+
+
+		/* SUBSLAVE: Whose job is to execute md5sum */
+		if(id == 0) {
+			args[1] = file_name;	
+			execvp("md5sum", args);
+		}
+		
+		/* SLAVE */
+		else {
+
+			// Wait until subslave sends something through pipe
+			ERROR_CHECK(select(FD_SETSIZE, &subslave_read_fd, NULL, NULL, NULL), -1, "Select in slave for reading pipe from app.", ERROR_SELECT_SUBSLAVE)
+			subslave_read_fd = backup_subslave_read_fd;		// Backup to previous state
+
+			// Read md5 hash
+			ERROR_CHECK(read(0, output, MD5_SIZE * sizeof(char)), -1, "Reading answer from sublsave.", ERROR_READ_SUBSLAVE_PIPE)		
+
+			// Flush stdin
+			int dump;
+			while ((dump = getchar()) != '\n' && dump != EOF);
+
+			wait(NULL); // Wait for subslave
+
+			// Write md5 hash to pipe that goes to app 
+			//TODO: chequeo de error
+			write(slave_to_app[WRITE], output, MD5_SIZE*sizeof(char));
+		}
+	}		
+	return 0;
 }
