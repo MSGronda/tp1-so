@@ -47,6 +47,7 @@
 typedef struct hash_info{
 	int pid;
 	char hash[MD5_SIZE + 1];
-	char file_name[MAX_NAME_LENGTH];	
+	char file_name[MAX_NAME_LENGTH];
+	int files_left;
 }hash_info;
 

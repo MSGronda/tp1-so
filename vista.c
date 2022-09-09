@@ -26,7 +26,8 @@
 typedef struct hash_info{
 	int pid;
 	char hash[MD5_SIZE + 1];
-	char file_name[MAX_NAME_LENGTH];	
+	char file_name[MAX_NAME_LENGTH];
+	int files_left;	
 }hash_info;
 
 int main(){
@@ -41,9 +42,13 @@ int main(){
 	sem_t * sem_smh = sem_open(SEMAPHORE_NAME,  O_RDONLY, S_IRUSR);
 	hash_info hash;
 
-	for(int i=0; 1; i++){
+	for(int i=0, finished=0; !finished; i++){
 		sem_wait(sem_smh);
 		pread(fd, &hash, sizeof(hash_info), i * sizeof(hash_info));
+
+		if(hash.files_left <= 1){
+			finished = 1;
+		}
 
 		printf("File: %s Md5: %s Pid: %d\n",hash.file_name, hash.hash, hash.pid);
 	}

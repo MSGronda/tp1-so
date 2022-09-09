@@ -222,12 +222,12 @@ int main(int argc, char * argv[]){
 					hash.pid = slaves[i].pid;
 					strcpy(hash.hash, ans);
 					strcpy(hash.file_name, slaves[i].prev_file_name);  
+					hash.files_left = num_files - curr_files_shm;
 
 					// Write to shared memory using an offset
 					pwrite(shm_fd, &hash, sizeof(hash_info), curr_files_shm * sizeof(hash_info));
 					curr_files_shm++;
 					sem_post(sem_smh);
-
 
 					// Send new files if there are any left
 					if(curr_files_sent <= num_files){
@@ -256,7 +256,7 @@ int main(int argc, char * argv[]){
 		
 	}
 
-	// // Unmapping an closing of shared memory
+	// // Unmapping and closing of shared memory
 	// ERROR_CHECK( munmap(mmap_addr, 3000), -1, "Unmapping shared memory", ERROR_UNMAPPING_SHM)
 	// ERROR_CHECK( shm_unlink(SHARED_MEMORY_NAME), -1, "Unlinking shared memory",ERROR_UNLINKING_SHM )
 	// ERROR_CHECK(close(shm_fd), -1, "Closing shared memory", ERROR_CLOSING_SHM)
