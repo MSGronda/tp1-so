@@ -33,6 +33,7 @@ int slave(int * app_to_slave, int * slave_to_app);
 
 
 void create_shared_resources(shared_resource_info * resources){
+	
 	// Create shared memory 
 	ERROR_CHECK_KEEP(shm_open(SHARED_MEMORY_NAME, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR), resources->shm_fd, -1, "Creating shared memory", ERROR_CREATING_SHM)
 	ERROR_CHECK(ftruncate(resources->shm_fd, 3000), -1, "Truncating shared memory", ERROR_TRUNCATE_SHM);
@@ -43,6 +44,7 @@ void create_shared_resources(shared_resource_info * resources){
 }
 
 void create_pipes(slave_info * slaves, fd_set * read_fd, int num_slaves){
+	
 	FD_ZERO(read_fd);
 
 	// Create pipes
@@ -52,18 +54,37 @@ void create_pipes(slave_info * slaves, fd_set * read_fd, int num_slaves){
 	}
 }
 
-void write_to_shm(shared_resource_info * resources, int pid, char * ans, char * prev_file_name, int num_files,  int * curr_files_shm){
+void write_to_shm(shared_resource_info * resources, int pid, char * ans, char * prev_file_name, int num_files,  int curr_files_shm){
+	
+	// Creating structure that is to be sent
 	hash_info hash;		
 	hash.pid = pid;
 	strcpy(hash.hash, ans);
 	strcpy(hash.file_name, prev_file_name);  
-	hash.files_left = num_files - (*curr_files_shm);
+	hash.files_left = num_files - curr_files_shm;
 
 	// Write to shared memory using an offset
-	pwrite(resources->shm_fd, &hash, sizeof(hash_info), (*curr_files_shm) * sizeof(hash_info));
+	pwrite(resources->shm_fd, &hash, sizeof(hash_info), curr_files_shm * sizeof(hash_info));
 	
+	// Signal that shared memory has item to be recieved
 	sem_post(resources->sem_smh);
-	(*curr_files_shm)++;
+}
+
+void free_resources(slave_info * slaves, shared_resource_info * resources, int num_slaves){
+
+	// Closing pipes and killing slaves
+	for(int i = 0; i < num_slaves; i++){
+		D_ERROR_CHECK(close(slaves[i].app_to_slave[WRITE]),close(slaves[i].slave_to_app[READ]), -1, "Closing pipes in app", ERROR_CLOSING_FINAL_PIPES )       
+		kill(slaves[i].pid, SIGKILL);
+	}
+
+	// // Unmapping and closing of shared memory
+	// ERROR_CHECK( munmap(resources->mmap_addr, 3000), -1, "Unmapping shared memory", ERROR_UNMAPPING_SHM)
+	// ERROR_CHECK( shm_unlink(SHARED_MEMORY_NAME), -1, "Unlinking shared memory",ERROR_UNLINKING_SHM )
+	// ERROR_CHECK(close(resources->shm_fd), -1, "Closing shared memory", ERROR_CLOSING_SHM)
+
+	// // Closing semaphore
+	// ERROR_CHECK(sem_close(resources->sem_smh), -1, "Closing semaphore", ERROR_CLOSING_SEM)
 }
 
 
@@ -127,7 +148,7 @@ int main(int argc, char * argv[]){
 
 		/* --- Creation of local variables --- */
 		char ans[MD5_SIZE + 1]= {0};
-		int curr_files_sent = 1, curr_files_read = 0, curr_files_shm = 0;	// Ignore first file bc it is the executable's name
+		int curr_files_sent = 1, curr_files_read = 0;	// Ignore first file bc it is the executable's name
 		
 
 		/* --- Close useless pipes --- */
@@ -137,12 +158,11 @@ int main(int argc, char * argv[]){
 
 
 		/* --- Initial distribution of files to slaves --- */
-		for(int i = 0; curr_files_sent < num_slaves; i++, curr_files_sent++){
-			// TODO: chequeo de errores
-			write(slaves[i].app_to_slave[WRITE], &(argv[curr_files_sent]), sizeof(char *));
+		for(int i = 0; curr_files_sent < num_slaves; i++){
+			ERROR_CHECK(write(slaves[i].app_to_slave[WRITE], &(argv[curr_files_sent]), sizeof(char *)), -1, "Writing to slave", ERROR_WRITING_PIPE ) ;
 			slaves[i].prev_file_name = argv[curr_files_sent];
+			curr_files_sent++;
 		}
-
 
 		/* --- File data is recieved from subslave process --- */
 		while(curr_files_read < num_files) {
@@ -157,48 +177,35 @@ int main(int argc, char * argv[]){
 
 					// Reading pipe from slave to app
 					ERROR_CHECK(read(slaves[i].slave_to_app[READ], ans, MD5_SIZE*sizeof(char)), -1, "Read in app", ERROR_READ_SLAVE_PIPE )
-					curr_files_read++;
-
-					// Write hash to shared memory
-					write_to_shm(&resources, slaves[i].pid, ans, slaves[i].prev_file_name, num_files, &curr_files_shm);
 					
+					// Write hash to shared memory
+					write_to_shm(&resources, slaves[i].pid, ans, slaves[i].prev_file_name, num_files, curr_files_read);
+					
+					curr_files_read++;
 
 					// Send new files if there are any left
 					if(curr_files_sent <= num_files){
-						write(slaves[i].app_to_slave[WRITE], &(argv[curr_files_sent]), sizeof(char *));
+						ERROR_CHECK(write(slaves[i].app_to_slave[WRITE], &(argv[curr_files_sent]), sizeof(char *)), -1, "Writing to slave", ERROR_WRITING_PIPE ) ;
 						slaves[i].prev_file_name = argv[curr_files_sent];
 						curr_files_sent++;
 					}
 				}
 			}
 
-			// Restore fds because select is destructive
+			// Restore fds since select is destructive
 			read_fd = backup_read_fd;
 		}
-		
-		// Finished processing, closing pipes and killing slaves
-		for(int i = 0; i < num_slaves; i++){
-			D_ERROR_CHECK(close(slaves[i].app_to_slave[WRITE]),close(slaves[i].slave_to_app[READ]), -1, "Closing pipes in app", ERROR_CLOSING_FINAL_PIPES )
-            
-            // TODO: matar al hijo pero de manera linda
-            kill(slaves[i].pid, SIGKILL);
-		}
-		
+
+		// Finished processing, closing pipes and killing slaves	
+		free_resources(slaves, &resources, num_slaves);
 	}
-
-	// // Unmapping and closing of shared memory
-	// ERROR_CHECK( munmap(resources.mmap_addr, 3000), -1, "Unmapping shared memory", ERROR_UNMAPPING_SHM)
-	// ERROR_CHECK( shm_unlink(SHARED_MEMORY_NAME), -1, "Unlinking shared memory",ERROR_UNLINKING_SHM )
-	// ERROR_CHECK(close(resources.shm_fd), -1, "Closing shared memory", ERROR_CLOSING_SHM)
-
-	// // Closing semaphore
-	// ERROR_CHECK(sem_close(resources.sem_smh), -1, "Closing semaphore", ERROR_CLOSING_SEM)
 
     return 0;
 }
 
 
 int slave(int * app_to_slave, int * slave_to_app){
+
 	// Close useless pipes
 	D_ERROR_CHECK(close(app_to_slave[WRITE]), close(slave_to_app[READ]),-1, "Closing useless pipes in slave", ERROR_CLOSING_SLAVE_PIPES)
 

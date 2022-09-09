@@ -28,6 +28,7 @@
 #define ERROR_MAPPING_SHM 20
 #define ERROR_CREATING_SEM 21
 #define ERROR_CLOSING_SEM 22
+#define ERROR_WRITING_PIPE 23
 
 
 // Constants
