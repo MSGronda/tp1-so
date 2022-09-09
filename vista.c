@@ -58,13 +58,13 @@ int main(int argc, char * argv[]){
 	hash_info hash;
 	for(int i=0, finished=0; !finished; i++){
 		sem_wait(sem_smh);
-		
+
 		pread(shm_fd, &hash, sizeof(hash_info), i * sizeof(hash_info));
 
 		if(hash.files_left <= 1){
 			finished = 1;
 		}
 
-		printf("File: %s Md5: %s Pid: %d\n",hash.file_name, hash.hash, hash.pid);
+		printf("\nFile: %s Md5: %s Pid: %d\n",hash.file_name, hash.hash, hash.pid);
 	}
 }
