@@ -1,3 +1,6 @@
+#ifndef _VISTA_H_
+#define _VISTA_H_
+
 #define _POSIX_SOURCE
 #define _BSD_SOURCE 
 #define _XOPEN_SOURCE 501
@@ -14,4 +17,6 @@
 #include <fcntl.h>
 #include <semaphore.h>
 #include <signal.h>
+
+#endif
 
