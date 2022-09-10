@@ -29,14 +29,12 @@
 #define ERROR_CREATING_SEM 21
 #define ERROR_CLOSING_SEM 22
 #define ERROR_WRITING_PIPE 23
-
+#define NO_FILES_FOUND 24
 
 // Constants
 #define MD5_SIZE 32
 #define MAX_NAME_LENGTH 100
-
-#define NO_FILES_FOUND 2
-
+#define SHM_SIZE 5000
 
 // Structs
 typedef struct hash_info{
@@ -46,6 +44,12 @@ typedef struct hash_info{
 	int files_left;
 }hash_info;
 
+// Contains data of the shared memory and the semaphore
+typedef struct shared_resource_info {
+	int shm_fd;
+	void * mmap_addr;
+	sem_t * sem_smh;
+}shared_resource_info;
 
 /* MACROS */
 

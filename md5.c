@@ -21,12 +21,6 @@ typedef struct slave_info {
 	char * prev_file_name;
 }slave_info;
 
-// Contains data of the shared memory and the semaphore
-typedef struct shared_resource_info {
-	int shm_fd;
-	void * mmap_addr;
-	sem_t * sem_smh;
-}shared_resource_info;
 
 /* PROTOTYPE */
 int slave(int * app_to_slave, int * slave_to_app);
@@ -36,8 +30,8 @@ void create_shared_resources(shared_resource_info * resources){
 	
 	// Create shared memory 
 	ERROR_CHECK_KEEP(shm_open(SHARED_MEMORY_NAME, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR), resources->shm_fd, -1, "Creating shared memory", ERROR_CREATING_SHM)
-	ERROR_CHECK(ftruncate(resources->shm_fd, 3000), -1, "Truncating shared memory", ERROR_TRUNCATE_SHM);
-	ERROR_CHECK_KEEP(mmap(NULL, 3000, PROT_READ|PROT_WRITE, MAP_SHARED, resources->shm_fd, 0), resources->mmap_addr, MAP_FAILED, "Mapping shared memory", ERROR_MAPPING_SHM)
+	ERROR_CHECK(ftruncate(resources->shm_fd, SHM_SIZE), -1, "Truncating shared memory", ERROR_TRUNCATE_SHM);
+	ERROR_CHECK_KEEP(mmap(NULL, SHM_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, resources->shm_fd, 0), resources->mmap_addr, MAP_FAILED, "Mapping shared memory", ERROR_MAPPING_SHM)
 
 	// Create semaphore for shared memory
 	ERROR_CHECK_KEEP(sem_open(SEMAPHORE_NAME,  O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0),  resources->sem_smh, SEM_FAILED, "Creating semaphore", ERROR_CREATING_SEM)
