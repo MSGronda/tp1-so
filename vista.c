@@ -1,6 +1,7 @@
 #include "vista.h"
 #include "defs.h"
 
+#define MAX_NAME_LENGTH 100
 
 void open_shm_sem(shared_resource_info * resources){
 
@@ -38,11 +39,11 @@ int main(int argc, char * argv[]){
 		semaphore_name = argv[2];
 	}
 	else{
-		shared_memory_name = malloc(100);
-		semaphore_name = malloc(100);
+		shared_memory_name = malloc(MAX_NAME_LENGTH);
+		semaphore_name = malloc(MAX_NAME_LENGTH);
 
-		fgets(shared_memory_name, 100, stdin);
-		fgets(semaphore_name, 100, stdin);
+		fgets(shared_memory_name, MAX_NAME_LENGTH, stdin);
+		fgets(semaphore_name, MAX_NAME_LENGTH, stdin);
 
 		shared_memory_name[strlen(shared_memory_name) -1] = 0;
 		semaphore_name[strlen(semaphore_name) -1] = 0;

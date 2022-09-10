@@ -270,8 +270,6 @@ int slave(int * app_to_slave, int * slave_to_app){
 		int id;
 		ERROR_CHECK_KEEP(fork(),id, -1, "Forking subslave", ERROR_CREATING_SUBSLAVE)
 
-
-
 		/* SUBSLAVE: Whose job is to execute md5sum */
 		if(id == 0) {
 			args[1] = file_name;	
@@ -295,8 +293,7 @@ int slave(int * app_to_slave, int * slave_to_app){
 			wait(NULL); // Wait for subslave
 
 			// Write md5 hash to pipe that goes to app 
-			//TODO: chequeo de error
-			write(slave_to_app[WRITE], output, MD5_SIZE*sizeof(char));
+			ERROR_CHECK(write(slave_to_app[WRITE], output, MD5_SIZE*sizeof(char)), -1, "Writing hash to app", ERROR_WRITING_PIPE );
 		}
 	}		
 	return 0;
