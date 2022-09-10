@@ -113,7 +113,6 @@ void free_resources(slave_info * slaves, shared_resource_info * resources, int n
 	ERROR_CHECK(sem_unlink(resources->close_sem_name), -1, "Closing semaphore", ERROR_CLOSING_SEM)
 }
 
-
 // Add a single fd to a set of fds
 void setup_add_select(fd_set * read, fd_set * backup_read, int fd){
 	FD_ZERO(read);

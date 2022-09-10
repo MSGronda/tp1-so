@@ -21,7 +21,7 @@ void open_shm_sem(shared_resource_info * resources){
 
 void free_resources(shared_resource_info * resources){
 	// Unmapping and closing of shared memory
-	ERROR_CHECK(munmap(resources->mmap_addr, 3000), -1, "Unmapping shared memory", ERROR_UNMAPPING_SHM)
+	ERROR_CHECK(munmap(resources->mmap_addr, SHM_SIZE), -1, "Unmapping shared memory", ERROR_UNMAPPING_SHM)
 	ERROR_CHECK(close(resources->shm_fd), -1, "Closing shared memory", ERROR_CLOSING_SHM)
 
 	// Closing semaphore
@@ -49,6 +49,7 @@ int main(int argc, char * argv[]){
 	else{
 		
 		//TODO: free en este caso!!!!
+		//TODO: chequeo de errores
 
 		shared_memory_name = malloc(MAX_NAME_LENGTH);
 		read_sem_name = malloc(MAX_NAME_LENGTH);
