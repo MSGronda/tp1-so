@@ -8,18 +8,27 @@
 #define READ 0 
 #define WRITE 1
 
+#define NORMAL 0
+#define BACKUP 1
+
 #define SHARED_MEMORY_NAME "md5_shm"
 #define SEMAPHORE_NAME "md5_sem"
 
 /* TYPEDEFS */
 
-// Contains data relating to each slave
+// Contains data relating to EACH slave
 typedef struct slave_info {
 	int app_to_slave[2];
 	int slave_to_app[2];
 	int pid;
 	char * prev_file_name;
 }slave_info;
+
+// Contains information of pipes from subslave to slave
+typedef struct subslave_info{
+	int fd_pipe[2];
+	fd_set set[2];
+}subslave_info;
 
 
 /* PROTOTYPE */
@@ -84,6 +93,24 @@ void free_resources(slave_info * slaves, shared_resource_info * resources, int n
 }
 
 
+// Add a single fd to a set of fds
+void setup_add_select(fd_set * read, fd_set * backup_read, int fd){
+	FD_ZERO(read);
+	FD_SET(fd, read);
+	*backup_read = *read;
+}
+
+void setup_subslave_pipes(subslave_info * subslave){
+	// Creating pipe connecting stdout (of subslave) to stdin (of slave)
+    ERROR_CHECK(pipe(subslave->fd_pipe), -1, "Creating pipe in slave",ERROR_CREATING_SUBSLAVE_PIPES);
+
+	// Redirect IO to pipe
+    D_ERROR_CHECK(dup2(subslave->fd_pipe[READ],0), dup2(subslave->fd_pipe[WRITE], 1), -1, "Rediecting IO pipe to slave", ERROR_SETTING_SUBSLAVE_PIPES)
+
+	// Read end pipe from subslave to slave 
+	setup_add_select(&(subslave->set[NORMAL]), &(subslave->set[BACKUP]), 0);		//TODO: remplazar el 0 con un define
+}
+
 int main(int argc, char * argv[]){
 	
 	// No files where give execution is halted
@@ -135,13 +162,13 @@ int main(int argc, char * argv[]){
 	}
 
 
-	/* --- Slave process is running --- */
+	/* --- SLAVE process is running --- */
 	if(curr_id == 0){
         slave(slaves[curr_slave-1].app_to_slave, slaves[curr_slave-1].slave_to_app);
 	}
 
 	
-    /* --- App process is running --- */
+    /* --- APP process is running --- */
 	else{
 
 		/* --- Creation of local variables --- */
@@ -204,44 +231,38 @@ int main(int argc, char * argv[]){
 
 int slave(int * app_to_slave, int * slave_to_app){
 
-	// Close useless pipes
-	D_ERROR_CHECK(close(app_to_slave[WRITE]), close(slave_to_app[READ]),-1, "Closing useless pipes in slave", ERROR_CLOSING_SLAVE_PIPES)
+	/* --- Creating local variables --- */
 
-	int fd[2];
+	// Slave to app and subslave to slave
+	subslave_info sublsave;
+	fd_set app_to_slave_set[2];
+
 	char * args[] = { "md5sum", NULL, NULL };	// 2nd arg will be path received from APP
-
-    // Pipe connecting stdout (of subslave) to stdin (of slave)
-    ERROR_CHECK(pipe(fd), -1, "Creating pipe in slave",ERROR_CREATING_SUBSLAVE_PIPES);
-	
-	// Redirect IO to pipe
-    D_ERROR_CHECK(dup2(fd[READ],0), dup2(fd[WRITE], 1), -1, "Rediecting IO pipe to slave", ERROR_SETTING_SUBSLAVE_PIPES)
-
-	// TODO: cerrar todos los fd que no usamos
-	
 	int finished = 0;					
 	char * file_name;
 	char output[MD5_SIZE + 1]= {0};		// calculated hash for file 
 
 
+	/* --- Closing useless pipes and creating new ones --- */
+
+	// Close useless pipes
+	D_ERROR_CHECK(close(app_to_slave[WRITE]), close(slave_to_app[READ]),-1, "Closing useless pipes in slave", ERROR_CLOSING_SLAVE_PIPES)
+	
+	// TODO: cerrar todos los fd que no usamos
+
 	// Read end of pipe between app and slave
-	fd_set slave_read_fd, backup_slave_read_fd;
-	FD_ZERO(&slave_read_fd);
-	FD_SET(app_to_slave[READ], &slave_read_fd);
-	backup_slave_read_fd = slave_read_fd;
+	setup_add_select(&(app_to_slave_set[NORMAL]), &(app_to_slave_set[BACKUP]), app_to_slave[READ]);
 
+	// Route pipes from subslave to slave
+	setup_subslave_pipes(&sublsave);
 
-	// Read end pipe from subslave to slave 
-	fd_set subslave_read_fd, backup_subslave_read_fd;
-	FD_ZERO(&subslave_read_fd);
-	FD_SET(0, &subslave_read_fd);					//TODO: remplazar el 0 con un define
-	backup_subslave_read_fd = subslave_read_fd;
 
 	while(!finished) {
 
         // Wait until father sends something through pipe
-		ERROR_CHECK(select(FD_SETSIZE, &slave_read_fd, NULL, NULL, NULL), -1, "Select in slave for reading pipe from app.",ERROR_SELECT_SLAVE)
+		ERROR_CHECK(select(FD_SETSIZE, &(app_to_slave_set[NORMAL]), NULL, NULL, NULL), -1, "Select in slave for reading pipe from app.",ERROR_SELECT_SLAVE)
 
-		slave_read_fd = backup_slave_read_fd;		// Backup to previous state
+		app_to_slave_set[NORMAL] = app_to_slave_set[BACKUP];		// Backup to previous state
 
 		// Read what app sent
 		ERROR_CHECK(read(app_to_slave[READ], &file_name, sizeof(char *)), -1,"Reading answer from sublsave.",  ERROR_SELECT_APP_TO_SLAVE)				
@@ -261,8 +282,8 @@ int slave(int * app_to_slave, int * slave_to_app){
 		else {
 
 			// Wait until subslave sends something through pipe
-			ERROR_CHECK(select(FD_SETSIZE, &subslave_read_fd, NULL, NULL, NULL), -1, "Select in slave for reading pipe from app.", ERROR_SELECT_SUBSLAVE)
-			subslave_read_fd = backup_subslave_read_fd;		// Backup to previous state
+			ERROR_CHECK(select(FD_SETSIZE, &(sublsave.set[NORMAL]), NULL, NULL, NULL), -1, "Select in slave for reading pipe from app.", ERROR_SELECT_SUBSLAVE)
+			sublsave.set[NORMAL] = sublsave.set[BACKUP];		// Backup to previous state
 
 			// Read md5 hash
 			ERROR_CHECK(read(0, output, MD5_SIZE * sizeof(char)), -1, "Reading answer from sublsave.", ERROR_READ_SUBSLAVE_PIPE)		

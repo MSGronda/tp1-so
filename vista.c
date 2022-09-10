@@ -1,21 +1,6 @@
-#define _POSIX_SOURCE
-#define _BSD_SOURCE 
-#define _XOPEN_SOURCE 501
-
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include <sys/wait.h>
-#include <sys/mman.h>
-
-#include <unistd.h>
-#include <fcntl.h>
-#include <semaphore.h>
-#include <signal.h>
-
+#include "vista.h"
 #include "defs.h"
+
 
 void open_shm_sem(shared_resource_info * resources){
 
@@ -31,7 +16,6 @@ void open_shm_sem(shared_resource_info * resources){
 void free_resources(shared_resource_info * resources){
 	// Unmapping and closing of shared memory
 	ERROR_CHECK(munmap(resources->mmap_addr, 3000), -1, "Unmapping shared memory", ERROR_UNMAPPING_SHM)
-	
 	ERROR_CHECK(close(resources->shm_fd), -1, "Closing shared memory", ERROR_CLOSING_SHM)
 
 	// Closing semaphore
@@ -68,15 +52,13 @@ int main(int argc, char * argv[]){
 
 	open_shm_sem(&resources);
 
-	/* --- Printing info --- */
 
 	// Turning off print buffering
 	setvbuf(stdout, NULL, _IONBF, 0);
 
-	printf("Calculating md5 hash...\n");
-
-
 	/* --- Recieving answer and broadcasting --- */
+
+	printf("Calculating md5 hash...\n");
 
 	for(int i=0, finished=0; !finished; i++){
 		sem_wait(resources.sem_smh);
