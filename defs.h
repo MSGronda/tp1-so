@@ -49,6 +49,8 @@ typedef struct shared_resource_info {
 	int shm_fd;
 	void * mmap_addr;
 	sem_t * sem_smh;
+	char * shared_memory_name;
+	char * semaphore_name;
 }shared_resource_info;
 
 /* MACROS */

@@ -29,12 +29,12 @@ int slave(int * app_to_slave, int * slave_to_app);
 void create_shared_resources(shared_resource_info * resources){
 	
 	// Create shared memory 
-	ERROR_CHECK_KEEP(shm_open(SHARED_MEMORY_NAME, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR), resources->shm_fd, -1, "Creating shared memory", ERROR_CREATING_SHM)
+	ERROR_CHECK_KEEP(shm_open(resources->shared_memory_name, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR), resources->shm_fd, -1, "Creating shared memory", ERROR_CREATING_SHM)
 	ERROR_CHECK(ftruncate(resources->shm_fd, SHM_SIZE), -1, "Truncating shared memory", ERROR_TRUNCATE_SHM);
 	ERROR_CHECK_KEEP(mmap(NULL, SHM_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, resources->shm_fd, 0), resources->mmap_addr, MAP_FAILED, "Mapping shared memory", ERROR_MAPPING_SHM)
 
 	// Create semaphore for shared memory
-	ERROR_CHECK_KEEP(sem_open(SEMAPHORE_NAME,  O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0),  resources->sem_smh, SEM_FAILED, "Creating semaphore", ERROR_CREATING_SEM)
+	ERROR_CHECK_KEEP(sem_open(resources->semaphore_name,  O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0),  resources->sem_smh, SEM_FAILED, "Creating semaphore", ERROR_CREATING_SEM)
 }
 
 void create_pipes(slave_info * slaves, fd_set * read_fd, int num_slaves){
@@ -74,11 +74,13 @@ void free_resources(slave_info * slaves, shared_resource_info * resources, int n
 
 	// // Unmapping and closing of shared memory
 	// ERROR_CHECK( munmap(resources->mmap_addr, 3000), -1, "Unmapping shared memory", ERROR_UNMAPPING_SHM)
-	// ERROR_CHECK( shm_unlink(SHARED_MEMORY_NAME), -1, "Unlinking shared memory",ERROR_UNLINKING_SHM )
 	// ERROR_CHECK(close(resources->shm_fd), -1, "Closing shared memory", ERROR_CLOSING_SHM)
+	// ERROR_CHECK(shm_unlink(resources->shared_memory_name), -1, "Unlinking shared memory",ERROR_UNLINKING_SHM )
+
 
 	// // Closing semaphore
 	// ERROR_CHECK(sem_close(resources->sem_smh), -1, "Closing semaphore", ERROR_CLOSING_SEM)
+	//ERROR_CHECK(sem_unlink(resources->semaphore_name), -1, "Closing semaphore", ERROR_CLOSING_SEM)
 }
 
 
@@ -96,6 +98,8 @@ int main(int argc, char * argv[]){
 	
 	//	Create shared memory and semaphore
 	shared_resource_info resources;
+	resources.shared_memory_name = SHARED_MEMORY_NAME;
+	resources.semaphore_name = SEMAPHORE_NAME;
 	create_shared_resources(&resources);
 
 	// Creating pipes for slaves and adding them to the select set
