@@ -14,7 +14,8 @@
 #define BACKUP 1
 
 #define SHARED_MEMORY_NAME "md5_shm"
-#define SEMAPHORE_NAME "md5_sem"
+#define READ_SEM_NAME "md5_read_sem"
+#define CLOSE_SEM_NAME "md5_shm_sem"
 
 /* TYPEDEFS */
 
@@ -44,8 +45,12 @@ void create_shared_resources(shared_resource_info * resources){
 	ERROR_CHECK(ftruncate(resources->shm_fd, SHM_SIZE), -1, "Truncating shared memory", ERROR_TRUNCATE_SHM);
 	ERROR_CHECK_KEEP(mmap(NULL, SHM_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, resources->shm_fd, 0), resources->mmap_addr, MAP_FAILED, "Mapping shared memory", ERROR_MAPPING_SHM)
 
-	// Create semaphore for shared memory
-	ERROR_CHECK_KEEP(sem_open(resources->semaphore_name,  O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0),  resources->sem_smh, SEM_FAILED, "Creating semaphore", ERROR_CREATING_SEM)
+	// Create semaphore for reading shared memory
+	ERROR_CHECK_KEEP(sem_open(resources->read_sem_name,  O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0),  resources->read_sem, SEM_FAILED, "Creating semaphore", ERROR_CREATING_SEM)
+
+	// Create semaphore for closing shared memory
+	ERROR_CHECK_KEEP(sem_open(resources->close_sem_name,  O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0),  resources->close_sem, SEM_FAILED, "Creating semaphore", ERROR_CREATING_SEM)
+	sem_post(resources->close_sem);
 }
 
 void create_pipes(slave_info * slaves, fd_set * read_fd, int num_slaves){
@@ -59,23 +64,28 @@ void create_pipes(slave_info * slaves, fd_set * read_fd, int num_slaves){
 	}
 }
 
-void write_to_shm(shared_resource_info * resources, int pid, char * ans, char * prev_file_name, int num_files,  int curr_files_shm){
-	
-	// Creating structure that is to be sent
-	hash_info hash;		
-	hash.pid = pid;
-	strcpy(hash.hash, ans);
-	strcpy(hash.file_name, prev_file_name);  
-	hash.files_left = num_files - curr_files_shm;
+void create_hash_info( hash_info * hash, int pid, char * ans, char * prev_file_name, int num_files,  int curr_files_shm){
 
-	// Write to shared memory using an offset
-	pwrite(resources->shm_fd, &hash, sizeof(hash_info), curr_files_shm * sizeof(hash_info));
-	
-	// Signal that shared memory has item to be recieved
-	sem_post(resources->sem_smh);
+	//TODO: chequeo de errores
+
+	// Creating structure that is to be sent
+	hash->pid = pid;
+	strcpy(hash->hash, ans);
+	strcpy(hash->file_name, prev_file_name);  
+	hash->files_left = num_files - curr_files_shm;
 }
 
-void free_resources(slave_info * slaves, shared_resource_info * resources, int num_slaves){
+void write_to_shm(shared_resource_info * resources, hash_info * hash, int curr_files_shm){
+	//TODO: chequeo de errores
+
+	// Write to shared memory using an offset
+	pwrite(resources->shm_fd, hash, sizeof(hash_info), curr_files_shm * sizeof(hash_info));
+	
+	// Signal that shared memory has item to be recieved
+	sem_post(resources->read_sem);
+}
+
+void free_resources(slave_info * slaves, shared_resource_info * resources, int num_slaves, FILE * output){
 
 	// Closing pipes and killing slaves
 	for(int i = 0; i < num_slaves; i++){
@@ -83,15 +93,24 @@ void free_resources(slave_info * slaves, shared_resource_info * resources, int n
 		kill(slaves[i].pid, SIGKILL);
 	}
 
-	// // Unmapping and closing of shared memory
-	// ERROR_CHECK( munmap(resources->mmap_addr, 3000), -1, "Unmapping shared memory", ERROR_UNMAPPING_SHM)
-	// ERROR_CHECK(close(resources->shm_fd), -1, "Closing shared memory", ERROR_CLOSING_SHM)
-	// ERROR_CHECK(shm_unlink(resources->shared_memory_name), -1, "Unlinking shared memory",ERROR_UNLINKING_SHM )
+	// Unmapping and closing of shared memory
+	ERROR_CHECK(munmap(resources->mmap_addr, SHM_SIZE), -1, "Unmapping shared memory", ERROR_UNMAPPING_SHM)
+	ERROR_CHECK(close(resources->shm_fd), -1, "Closing shared memory", ERROR_CLOSING_SHM)
+	
+	// Closing semaphore
+	ERROR_CHECK(sem_close(resources->read_sem), -1, "Closing semaphore", ERROR_CLOSING_SEM)
 
+	// Closing file
+	ERROR_CHECK(fclose(output), EOF, "Closing file", ERROR_CLOSING_FILE)
+	
+	// Wait until vista stops reading shared memory. If vista doesnt exist, continue.
+	sem_wait(resources->close_sem);
 
-	// // Closing semaphore
-	// ERROR_CHECK(sem_close(resources->sem_smh), -1, "Closing semaphore", ERROR_CLOSING_SEM)
-	//ERROR_CHECK(sem_unlink(resources->semaphore_name), -1, "Closing semaphore", ERROR_CLOSING_SEM)
+	ERROR_CHECK(sem_close(resources->close_sem), -1, "Closing semaphore", ERROR_CLOSING_SEM)
+	
+	ERROR_CHECK(shm_unlink(resources->shared_memory_name), -1, "Unlinking shared memory",ERROR_UNLINKING_SHM )
+	ERROR_CHECK(sem_unlink(resources->read_sem_name), -1, "Closing semaphore", ERROR_CLOSING_SEM)
+	ERROR_CHECK(sem_unlink(resources->close_sem_name), -1, "Closing semaphore", ERROR_CLOSING_SEM)
 }
 
 
@@ -128,7 +147,8 @@ int main(int argc, char * argv[]){
 	//	Create shared memory and semaphore
 	shared_resource_info resources;
 	resources.shared_memory_name = SHARED_MEMORY_NAME;
-	resources.semaphore_name = SEMAPHORE_NAME;
+	resources.read_sem_name = READ_SEM_NAME;
+	resources.close_sem_name = CLOSE_SEM_NAME;
 	create_shared_resources(&resources);
 
 	// Creating pipes for slaves and adding them to the select set
@@ -139,6 +159,9 @@ int main(int argc, char * argv[]){
 
 	backup_read_fd = read_fd;
 
+	// Create file for output
+	FILE * output;
+	ERROR_CHECK_KEEP(fopen("respuesta.txt","w"), output, NULL, "Creating output file", ERROR_CREATING_FILE)
 
 	/* --- Broadcast for vista process --- */
 
@@ -148,8 +171,11 @@ int main(int argc, char * argv[]){
 	// Broadcast shared memory address
 	printf("%s\n", SHARED_MEMORY_NAME);
 
-	// Broadcast sempaphore
-	printf("%s\n", SEMAPHORE_NAME);
+	// Broadcast read shared memory sempaphore
+	printf("%s\n", READ_SEM_NAME);
+
+	// Broadcast close shared memory sempaphore
+	printf("%s\n", CLOSE_SEM_NAME);
 
 	sleep(2);
 	
@@ -176,6 +202,7 @@ int main(int argc, char * argv[]){
 		/* --- Creation of local variables --- */
 		char ans[MD5_SIZE + 1]= {0};
 		int curr_files_sent = 1, curr_files_read = 0;	// Ignore first file bc it is the executable's name
+		hash_info hash;
 		
 
 		/* --- Close useless pipes --- */
@@ -205,10 +232,16 @@ int main(int argc, char * argv[]){
 					// Reading pipe from slave to app
 					ERROR_CHECK(read(slaves[i].slave_to_app[READ], ans, MD5_SIZE*sizeof(char)), -1, "Read in app", ERROR_READ_SLAVE_PIPE )
 					
+					// Creating hash info
+					create_hash_info(&hash, slaves[i].pid, ans, slaves[i].prev_file_name, num_files, curr_files_read);
+
 					// Write hash to shared memory
-					write_to_shm(&resources, slaves[i].pid, ans, slaves[i].prev_file_name, num_files, curr_files_read);
-					
+					write_to_shm(&resources, &hash, curr_files_read);
+					 
 					curr_files_read++;
+
+					// Write hash to file
+					fprintf(output, "\nFile: %s Md5: %s Pid: %d\n", hash.file_name, hash.hash, hash.pid);
 
 					// Send new files if there are any left
 					if(curr_files_sent <= num_files){
@@ -224,7 +257,7 @@ int main(int argc, char * argv[]){
 		}
 
 		// Finished processing, closing pipes and killing slaves	
-		free_resources(slaves, &resources, num_slaves);
+		free_resources(slaves, &resources, num_slaves, output);
 	}
 
     return 0;

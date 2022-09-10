@@ -30,6 +30,8 @@
 #define ERROR_CLOSING_SEM 22
 #define ERROR_WRITING_PIPE 23
 #define NO_FILES_FOUND 24
+#define ERROR_CREATING_FILE 25
+#define ERROR_CLOSING_FILE 26
 
 // Constants
 #define MD5_SIZE 32
@@ -48,9 +50,13 @@ typedef struct hash_info{
 typedef struct shared_resource_info {
 	int shm_fd;
 	void * mmap_addr;
-	sem_t * sem_smh;
 	char * shared_memory_name;
-	char * semaphore_name;
+
+	char * read_sem_name;
+	sem_t * read_sem;
+
+	char * close_sem_name;
+	sem_t * close_sem;
 }shared_resource_info;
 
 /* MACROS */
@@ -60,11 +66,13 @@ typedef struct shared_resource_info {
 																																	perror((error_msg)); 		\
 																																	exit((exit_value));			\
 																																}
+
 // If either of the two functios returns an error, execution is ended
 #define D_ERROR_CHECK(func1, func2, error_value, error_msg, exit_value) 	if( ((func1) == (error_value)) || ((func2) == (error_value))){ 	\
 																																							perror((error_msg)); 		\
 																																							exit((exit_value));			\
 																																						}
+
 // Stores return value and checks if it is an error, if so, execution is ended
 #define ERROR_CHECK_KEEP(func, value, error_value, error_msg, exit_value) if(((value) = (func)) == error_value){ \
 																																						perror(error_msg); \
