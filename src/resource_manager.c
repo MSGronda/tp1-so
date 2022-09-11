@@ -89,7 +89,6 @@ void unlink_shm(char * shm_name)
 	}
 }
 
-
 // TODO: No se si es con * o sin
 void create_pipe(int fd[2]) 
 {
@@ -138,3 +137,10 @@ int create_slave()
 	return out;
 }
 
+void redirect_fd(int oldfd, int newfd)
+{
+	if(dup2(oldfd, newfd) == -1) {
+		perror("Dup2");
+		exit(ERROR_DUP2);
+	} 
+}

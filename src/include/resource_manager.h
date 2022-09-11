@@ -58,4 +58,6 @@ void close_file(FILE * stream);
 
 int create_slave();
 
+void redirect_fd(int oldfd, int newfd);
+
 #endif

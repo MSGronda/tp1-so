@@ -1,0 +1,6 @@
+
+File: ./Makefile Md5: 89df71985f5f92fa4d55bf5a818d50b7 Pid: 3393
+
+File: ./md5 Md5: 44db4441b1d93ca955ab5252485aa2c1 Pid: 3394
+
+File: ./vista Md5: 8821f9f2e3d61b411e07c5cad5d16218 Pid: 3393

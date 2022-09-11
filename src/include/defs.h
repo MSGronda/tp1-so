@@ -40,6 +40,11 @@
 #define SHM_SIZE 4096
 #define MAX_NAME_LENGTH 100
 
+#define READ 0 
+#define WRITE 1
+
+
+
 /* structs */
 typedef struct hash_info {
 	int pid;

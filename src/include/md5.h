@@ -26,6 +26,7 @@ int slave(int * app_to_slave, int * slave_to_app);
 void redirect_fd(int oldfd, int newfd);
 void send_file(int fd, char ** src);
 void write_to_shm(int fd, sem_t * addr, hash_info * hash_data, int curr_files_shm); 
+int is_regular_file(const char *path);
 
 
 #endif
