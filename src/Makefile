@@ -1,17 +1,20 @@
 include Makefile.inc
 
-SOURCES=$(wildcard *.c)
-OUTPUT_FILE=./../md5
+VISTA_SOURCES=vista.c
+MD5_SOURCES=md5.c
+SHARED_SOURCES=resource_manager.c
+MD5_OUTPUT_FILE=./../md5
+VISTA_OUTPUT_FILE=./../vista
 
-all: md5 vista
+all: vista md5
 
 vista:
-	cd vista; make all
+	$(GCC) $(GCCFLAGS) $(VISTA_SOURCES) $(SHARED_SOURCES) -o $(VISTA_OUTPUT_FILE)
 
 md5:
-	$(GCC) $(GCCFLAGS) $(SOURCES) -o $(OUTPUT_FILE)
+	$(GCC) $(GCCFLAGS) $(MD5_SOURCES) $(SHARED_SOURCES) -o $(MD5_OUTPUT_FILE)
 
 clean:
-	rm -f $(OUTPUT_FILE)
+	rm -f $(VISTA_OUTPUT_FILE) $(MD5_OUTPUT_FILE)
 
-.PHONY: all clean md5
+.PHONY: all clean md5 vista

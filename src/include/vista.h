@@ -18,4 +18,7 @@
 #include <semaphore.h>
 #include <signal.h>
 
+#include "resource_manager.h"
+#include "defs.h"
+
 #endif

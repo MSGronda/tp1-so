@@ -5,6 +5,5 @@ src:
 
 clean:
 	cd src; make clean
-	cd src; cd vista; make clean
 
 .PHONY: all src clean
