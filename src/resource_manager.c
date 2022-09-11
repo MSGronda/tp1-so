@@ -66,9 +66,9 @@ void unlink_shm(char * shm_name)
 
 
 // TODO: No se si es con * o sin
-void create_pipe(int * fd[2]) 
+void create_pipe(int fd[2]) 
 {
-	if(pipe(&fd) == -1) {
+	if(pipe(fd) == -1) {
 		perror("Creating pipes");
 		exit(ERROR_CREATING_PIPES);
 	}

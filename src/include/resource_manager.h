@@ -14,6 +14,7 @@ typedef struct sem_info {
 	sem_t * addr;
 } sem_info;
 
+
 /* PROTOTYPES */
 void create_semaphore(sem_info * sem_data);
 
