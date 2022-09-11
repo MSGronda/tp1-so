@@ -51,7 +51,7 @@ void create_pipe(int fd[2]);
 void close_fd(int fd);
 
 
-void create_file(const char * pathname, const char * mode, FILE * out);
+FILE * create_file( char * pathname, char * mode);
 
 void close_file(FILE * stream);
 

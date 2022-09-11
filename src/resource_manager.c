@@ -108,12 +108,14 @@ void close_fd(int fd)
 }
 
 
-void create_file(const char * pathname, const char * mode, FILE * out)
+FILE * create_file( char * pathname,  char * mode)
 {
+	FILE * out;
 	if((out = fopen("respuesta.txt", "w")) == NULL) {
 		perror("Creating output file");
 		exit(ERROR_CREATING_FILE);
 	}
+	return out;
 }
 
 void close_file(FILE * stream)

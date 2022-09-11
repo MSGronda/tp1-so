@@ -34,8 +34,17 @@ int main(int argc, char * argv[])
 {
 	if(argc <= 1) return NO_FILES_FOUND;
 
+	char * files[argc];
+
+	int num_files=0;
+	for(int i=1; i<argc; i++){
+		if(is_regular_file(argv[i])){
+			files[num_files] = argv[i];
+			num_files++;
+		}
+	}
+
 	/* --- Creation of local variables and necessary resources --- */
-	int num_files = argc - 1;
 	int num_slaves = ceil((double) num_files / FILES_PER_SLAVE); 	// TODO: ARREGLAR ESTO
 
 	//	Create shared memory and semaphore
@@ -49,8 +58,7 @@ int main(int argc, char * argv[])
 	create_shm(&shm_data);
 	create_semaphore(&semaphore_read);
 	create_semaphore(&semaphore_close);
-	sem_post(semaphore_close.addr);
-
+	sem_post(semaphore_close.addr);	
 
 	// Creating pipes for slaves and adding them to the select set
 	slave_info slaves[num_slaves];
@@ -67,8 +75,7 @@ int main(int argc, char * argv[])
 	fd_backup_read = fd_read;
 
 	// Create file for output
-	FILE * output;
-	create_file("respuesta.txt", "w", output);
+	FILE * output = create_file("respuesta.txt", "w");
 
 	/* --- Broadcast for VISTA process --- */
 	// Turning off print buffering
@@ -99,7 +106,7 @@ int main(int argc, char * argv[])
 			; 
 			/* --- Creation of local variables --- */
 			char ans[MD5_SIZE + 1] = { 0 };
-			int curr_files_sent = 1, curr_files_read = 0;	// Ignore first file bc it is the executable's name
+			int curr_files_sent = 0, curr_files_read = 0;	// Ignore first file bc it is the executable's name
 			hash_info hash_data;
 
 			/* --- Close useless ends of pipes --- */
@@ -110,10 +117,10 @@ int main(int argc, char * argv[])
 
 	        /* --- Initial distribution of files to slaves --- */
 			for(int i = 0; curr_files_sent < num_slaves; i++) {
-				send_file(slaves[i].app_to_slave[WRITE], argv[curr_files_sent]);
-				slaves[i].prev_file_name = argv[curr_files_sent];
-
+				send_file(slaves[i].app_to_slave[WRITE], &(files[curr_files_sent]));
+				slaves[i].prev_file_name = files[curr_files_sent];
 				curr_files_sent++;
+				
 			}
 
 			/* --- File data is received from subslave process --- */
@@ -144,17 +151,15 @@ int main(int argc, char * argv[])
 						// Write hash to file
 						fprintf(output, "\nFile: %s Md5: %s Pid: %d\n", hash_data.file_name, hash_data.hash, hash_data.pid);
 
-						if(curr_files_sent <= num_files) {
-							send_file(slaves[i].app_to_slave[WRITE], argv[curr_files_sent]);
-							slaves[i].prev_file_name = argv[curr_files_sent];
-
+						if(curr_files_sent < num_files) {
+							send_file(slaves[i].app_to_slave[WRITE], &(files[curr_files_sent]));
+							slaves[i].prev_file_name = files[curr_files_sent];
 							curr_files_sent++;
 						}
 					}
 				}
 				fd_read = fd_backup_read;
 			}
-
 			/* --- Free Resources --- */
 			for(int i = 0; i < num_slaves; i++) {
 				close_fd(slaves[i].app_to_slave[WRITE]);
@@ -201,20 +206,22 @@ int slave(int * app_to_slave, int * slave_to_app)
 	// TODO: cerrar todos los fd que no usamos
 
 	// Read end of pipe between app and slave
-	FD_ZERO(&app_to_slave_set[NORMAL]);
-	FD_SET(app_to_slave[READ], &app_to_slave_set[NORMAL]);
+	FD_ZERO(&(app_to_slave_set[NORMAL]));
+	FD_SET(app_to_slave[READ], &(app_to_slave_set[NORMAL]));
 	app_to_slave_set[BACKUP] = app_to_slave_set[NORMAL];
 
 	create_pipe(subslave.fd_pipe);
+
 	redirect_fd(subslave.fd_pipe[READ], 0);
 	redirect_fd(subslave.fd_pipe[WRITE], 1);
 
-	FD_ZERO(&subslave.set[NORMAL]);
-	FD_SET(0, &subslave.set[NORMAL]);
+	FD_ZERO(&(subslave.set[NORMAL]));
+	FD_SET(0, &(subslave.set[NORMAL]));
 	subslave.set[BACKUP] = subslave.set[NORMAL];
 
 	while(!finished) {
-		if(select(FD_SETSIZE, &app_to_slave_set[NORMAL], NULL, NULL, NULL) == -1) {
+
+		if(select(FD_SETSIZE, &(app_to_slave_set[NORMAL]), NULL, NULL, NULL) == -1) {
 			perror("Select in slave");
 			exit(ERROR_SELECT_APP);
 		}
@@ -224,7 +231,6 @@ int slave(int * app_to_slave, int * slave_to_app)
 			perror("Reading answer from subslave.");
 			exit(ERROR_SELECT_APP_TO_SLAVE);
 		}
-
 		int id = create_slave();
 		switch(id) {
 			/* SUBSLAVE: Whose job is to execute md5sum */
@@ -241,7 +247,7 @@ int slave(int * app_to_slave, int * slave_to_app)
 				}
 				subslave.set[NORMAL] = subslave.set[BACKUP];		// Backup to previous state
 
-				if(read(0, output, sizeof(char)) == -1) {
+				if(read(0, output, MD5_SIZE * sizeof(char)) == -1) {
 					perror("Reading answer from subslave.");
 					exit(ERROR_READ_SUBSLAVE_PIPE);
 				}
@@ -262,6 +268,13 @@ int slave(int * app_to_slave, int * slave_to_app)
 	return 0;
 }
 
+int is_regular_file(const char *path)
+{
+    struct stat path_stat;
+    stat(path, &path_stat);
+    return S_ISREG(path_stat.st_mode);
+}
+
 
 void redirect_fd(int oldfd, int newfd)
 {
@@ -273,9 +286,9 @@ void redirect_fd(int oldfd, int newfd)
 
 
 // No se que onda los *
-void send_file(int fd, const char * src)
+void send_file(int fd, char ** src)
 {
-	if(write(fd, &src, sizeof(char *)) == -1) {
+	if(write(fd, src, sizeof(char *)) == -1) {
 		perror("Writing to slave");
 		exit(ERROR_WRITING_PIPE);
 	}
@@ -286,7 +299,10 @@ void write_to_shm(int fd, sem_t * addr, hash_info * hash_data, int curr_files_sh
 {
 	//TODO: chequeo de errores
 
-	pwrite(fd, hash_data, sizeof(hash_data), curr_files_shm * sizeof(hash_info));
+	if(pwrite(fd, hash_data, sizeof(hash_data), curr_files_shm * sizeof(hash_info)) == -1){
+		perror("AAAAA");
+		exit(1);
+	}
 
 	sem_post(addr);
 }
