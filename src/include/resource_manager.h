@@ -18,12 +18,16 @@ typedef struct sem_info {
 /* PROTOTYPES */
 void create_semaphore(sem_info * sem_data);
 
+void open_semaphore(sem_info * sem_data)
+
 void close_semaphore(sem_info * sem_data);
 
-void unlink_sem(char * sem_name)
+void unlink_semaphore(char * sem_name)
 
 
 void create_shm(shm_info * shm_data);
+
+int open_shm(shm_info * shm_data) 
 
 void close_shm(shm_info * shm_data);
 

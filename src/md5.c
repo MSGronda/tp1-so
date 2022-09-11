@@ -172,8 +172,8 @@ int main(int argc, char * argv[])
 			close_semaphore(&semaphore_close);
 
 			unlink_shm(shm_data.name);
-			unlink_sem(sem_data.name);
-			unlink_sem(sem_data.name);
+			unlink_semaphore(sem_data.name);
+			unlink_semaphore(sem_data.name);
 			break;
 	}
 

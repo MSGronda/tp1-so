@@ -8,6 +8,14 @@ void create_semaphore(sem_info * sem_data)
 	}
 }
 
+void open_semaphore(sem_info * sem_data)
+{
+	if((sem_data->addr = sem_open(sem_data->name, O_RDONLY, S_IRUSR, 0)) == -1) {
+		perror("Creating semaphore");
+		exit(ERROR_CREATING_SEMAPHORE);
+	}
+}
+
 void close_semaphore(sem_info * sem_data)
 {
 	if(sem_close(sem_data->addr) == -1) {
@@ -16,7 +24,7 @@ void close_semaphore(sem_info * sem_data)
 	}
 }
 
-void unlink_sem(char * sem_name)
+void unlink_semaphore(char * sem_name)
 {
 	if(sem_unlink(sem_name) == -1) {
 		perror("Unlinking semaphore");
@@ -24,7 +32,8 @@ void unlink_sem(char * sem_name)
 	}
 }
 
-
+// por ahora tiene esos flags porque son los que se necesitan
+// estaria bueno hacerla mas general :)
 void create_shm(shm_info * shm_data) 
 {
 	if((shm_data->fd = shm_open(shm_data->name, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR)) == -1) {
@@ -38,6 +47,21 @@ void create_shm(shm_info * shm_data)
 	}
 
 	if((shm_data->mmap_addr = mmap(NULL, SHM_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, shm_data->fd, 0)) == -1) {
+		perror("Mapping shared memory");
+		exit(ERROR_MAPPING_SHM);
+	}
+}
+
+// por ahora tiene esos flags porque son los que se necesitan
+// estaria bueno hacerla mas general :)
+int open_shm(shm_info * shm_data) 
+{
+	if((shm_data->fd = shm_open(shm_data->name, O_RDONLY, S_IRUSR)) == -1) {
+		perror("Creating shared memory");
+		exit(ERROR_CREATING_SHM);
+	}
+
+	if((shm_data->mmap_addr = mmap(NULL, SHM_SIZE, PROT_READ, MAP_SHARED, shm_data->fd, 0)) == -1) {
 		perror("Mapping shared memory");
 		exit(ERROR_MAPPING_SHM);
 	}
