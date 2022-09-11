@@ -28,22 +28,22 @@ int main(int argc, char * argv[])
 {
 	if(argc <= 1) return NO_FILES_FOUND;
 
-	/* --- Creation of local variables and necesary resources --- */
+	/* --- Creation of local variables and necessary resources --- */
 	int num_files = argc - 1;
-	int num_slaves = ceil((double) num_files / FILES_PER_SLAVE); // TODO: ARREGLAR ESTO
+	int num_slaves = ceil((double) num_files / FILES_PER_SLAVE); 	// TODO: ARREGLAR ESTO
 
 	//	Create shared memory and semaphore
 	shm_info shm_data;
-	sem_info sem_read, sem_close;
+	sem_info semaphore_read, semaphore_close;
 
 	shm_data.name = SHM_NAME;
-	sem_read.name = SEM_READ_NAME;
-	sem_close.name = SEM_CLOSE_NAME;
+	semaphore_read.name = SEM_READ_NAME;
+	semaphore_close.name = SEM_CLOSE_NAME;
 
 	create_shm(&shm_data);
-	create_semaphore(&sem_read);
-	create_semaphore(&sem_close);
-	sem_post(sem_close.addr);
+	create_semaphore(&semaphore_read);
+	create_semaphore(&semaphore_close);
+	sem_post(semaphore_close.addr);
 
 
 	// Creating pipes for slaves and adding them to the select set
@@ -62,10 +62,7 @@ int main(int argc, char * argv[])
 
 	// Create file for output
 	FILE * output;
-	if((output = fopen("respuesta.txt", "w")) == NULL) {
-		perror("Creating output file");
-		exit(ERROR_CREATING_FILE);
-	}
+	create_file("respueta.txt", "w", output);
 
 	/* --- Broadcast for VISTA process --- */
 	// Turning off print buffering
@@ -88,7 +85,7 @@ int main(int argc, char * argv[])
 	switch(curr_id) {
 		/* --- SLAVE process is running --- */
 		case 0:
-			slave();
+			slave(slaves[curr_slave - 1].app_to_slave, slaves[curr_slave - 1].slave_to_app);
 			break;
 
     	/* --- APP process is running --- */
@@ -134,7 +131,7 @@ int main(int argc, char * argv[])
 						strcpy(hash_data.file_name, prev_file_name);  
 						hash_data.files_left = num_files - curr_files_shm;
 
-						write_to_shm(shm_data.fd, sem_read.addr, &hash_data, curr_files_read);
+						write_to_shm(shm_data.fd, semaphore_read.addr, &hash_data, curr_files_read);
 						curr_files_read++;
 
 						// Write hash to file
@@ -150,6 +147,7 @@ int main(int argc, char * argv[])
 				}
 				fd_read = fd_backup_read;
 			}
+
 			/* --- Free Resources --- */
 			for(int i = 0; i < num_slaves; i++) {
 				close_fd(slaves[i].app_to_slave[WRITE]);
@@ -157,6 +155,19 @@ int main(int argc, char * argv[])
 				
 				kill(slaves[i].pid, SIGKILL);
 			}
+
+			close_shm(&shm_data);
+			close_semaphore(&semaphore_read);
+			close_file(output);
+
+			// Wait until vista stops reading shared memory. If vista doesnt exist, continue.
+			sem_wait(semaphore_close.addr);
+
+			close_semaphore(&semaphore_close);
+
+			unlink_shm(shm_data.name);
+			unlink_sem(sem_data.name);
+			unlink_sem(sem_data.name);
 			break;
 	}
 
@@ -164,9 +175,8 @@ int main(int argc, char * argv[])
 }
 
 
-void free_resources(slave_info * slaves, shared_resource_info * resources, int num_slaves, FILE * output) 
+int slave(int * app_to_slave, int * slave_to_app)
 {
-
 }
 
 // No se que onda los *

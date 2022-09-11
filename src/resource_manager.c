@@ -10,11 +10,20 @@ void create_semaphore(sem_info * sem_data)
 
 void close_semaphore(sem_info * sem_data)
 {
-	if(sem_close(resources->read_sem) == -1) {
+	if(sem_close(sem_data->addr) == -1) {
 		perror("Closing semaphore");
 		exit(ERROR_CLOSING_SEM);
 	}
 }
+
+void unlink_sem(char * sem_name)
+{
+	if(sem_unlink(sem_name) == -1) {
+		perror("Unlinking semaphore");
+		exit(ERROR_UNLINKING_SEM);
+	}
+}
+
 
 void create_shm(shm_info * shm_data) 
 {
@@ -47,6 +56,15 @@ void close_shm(shm_info * shm_data)
 	}
 }
 
+void unlink_shm(char * shm_name)
+{
+	if(shm_unlink(shm_name) == -1) {
+		perror("Unlinking shared memory");
+		exit(ERROR_UNLINKING_SHM);
+	}
+}
+
+
 // TODO: No se si es con * o sin
 void create_pipe(int * fd[2]) 
 {
@@ -64,6 +82,24 @@ void close_fd(int fd)
 	}
 }
 
+
+void create_file(const char * pathname, const char * mode, FILE * out)
+{
+	if((out = fopen("respuesta.txt", "w")) == NULL) {
+		perror("Creating output file");
+		exit(ERROR_CREATING_FILE);
+	}
+}
+
+void close_file(FILE * stream)
+{
+	if(fclose(stream) == EOF) {
+		perror("Closing file");
+		exit(ERROR_CLOSING_FILE);
+	}
+}
+
+
 int create_slave() 
 {
 	int out = 0;
@@ -74,3 +110,4 @@ int create_slave()
 
 	return out;
 }
+
