@@ -299,10 +299,7 @@ void write_to_shm(int fd, sem_t * addr, hash_info * hash_data, int curr_files_sh
 {
 	//TODO: chequeo de errores
 
-	if(pwrite(fd, hash_data, sizeof(hash_data), curr_files_shm * sizeof(hash_info)) == -1){
-		perror("AAAAA");
-		exit(1);
-	}
+	pwrite(fd, hash_data, sizeof(hash_info), curr_files_shm * sizeof(hash_info));
 
 	sem_post(addr);
 }

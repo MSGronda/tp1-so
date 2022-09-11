@@ -58,7 +58,7 @@ void create_shm(shm_info * shm_data)
 void open_shm(shm_info * shm_data) 
 {
 	if((shm_data->fd = shm_open(shm_data->name, O_RDONLY, S_IRUSR)) == -1) {
-		perror("Creating shared memory");
+		perror("Opening shared memory");
 		exit(ERROR_CREATING_SHM);
 	}
 
