@@ -50,6 +50,7 @@ int slave(int * app_to_slave, int * slave_to_app)
 		CHECK_ERROR( read(app_to_slave[READ], &file_name, sizeof(char *)), -1, "Reading answer from subslave.", ERROR_SELECT_APP_TO_SLAVE)
 
 		int id = create_slave();
+		
 		switch(id) {
 			/* SUBSLAVE: Whose job is to execute md5sum */
 			case 0:

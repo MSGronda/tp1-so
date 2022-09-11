@@ -17,6 +17,7 @@
 #include <fcntl.h>
 #include <semaphore.h>
 #include <signal.h>
+#include <limits.h>
 
 #include "resource_manager.h"
 #include "defs.h"

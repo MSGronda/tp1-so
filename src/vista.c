@@ -1,30 +1,22 @@
 #include "./include/vista.h"
 
-#define MAX_NAME_LENGTH 100
-
 int main(int argc, char * argv[]) 
 {
-	char * shm_name, * sem_read_name, * sem_close_name;
+	char shm_name[NAME_MAX], sem_read_name[NAME_MAX], sem_close_name[NAME_MAX];
 	shm_info shm_data;
 	sem_info semaphore_read, semaphore_close;
 	hash_info hash_data;
 
 	if(argc >= 4) { // arguments are sent via function arguments
-		shm_name= argv[1];
-		sem_read_name = argv[2];
-		sem_close_name = argv[3];
+		strncpy(shm_name,argv[1], NAME_MAX);
+		strncpy(sem_read_name,argv[2], NAME_MAX);
+		strncpy(sem_read_name,argv[3], NAME_MAX);
 	}
 	else //arguments are sent via stdin
 	{
-		//TODO: free en este caso!!!!
-		//TODO: chequeo de errores
-		shm_name = malloc(MAX_NAME_LENGTH);
-		sem_read_name = malloc(MAX_NAME_LENGTH);
-		sem_close_name = malloc(MAX_NAME_LENGTH);
-
-		fgets(shm_name, MAX_NAME_LENGTH, stdin);
-		fgets(sem_read_name, MAX_NAME_LENGTH, stdin);
-		fgets(sem_close_name, MAX_NAME_LENGTH, stdin);
+		fgets(shm_name, NAME_MAX, stdin);
+		fgets(sem_read_name, NAME_MAX, stdin);
+		fgets(sem_close_name, NAME_MAX, stdin);
 
 		shm_name[strlen(shm_name) -1] = 0;
 		sem_read_name[strlen(sem_read_name) -1] = 0;
@@ -51,7 +43,12 @@ int main(int argc, char * argv[])
 	for(int i = 0, finished = 0; !finished; i++) {
 		sem_wait(semaphore_read.addr);
 
-		pread(shm_data.fd, &hash_data, sizeof(hash_info), i * sizeof(hash_info));
+		if(pread(shm_data.fd, &hash_data, sizeof(hash_info), i * sizeof(hash_info)) == -1){
+			sem_post(semaphore_close.addr);		// Allow app to free resources
+			perror("Reading shared memory");
+			exit(1238128381);
+		}
+		
 		printf("\nFile: %s Md5: %s Pid: %d\n",hash_data.file_name, hash_data.hash, hash_data.pid);
 
 		if(hash_data.files_left <= 1)

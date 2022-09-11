@@ -20,8 +20,6 @@ typedef struct slave_info {
 
 int main(int argc, char * argv[])
 {
-	if(argc <= 1) return NO_FILES_FOUND;
-
 	char * files[argc];
 
 	int num_files=0;
@@ -31,6 +29,8 @@ int main(int argc, char * argv[])
 			num_files++;
 		}
 	}
+
+	if(argc <= 1 || num_files == 0) return NO_FILES_FOUND;
 
 	/* --- Creation of local variables and necessary resources --- */
 	int num_slaves = ceil((double) num_files / FILES_PER_SLAVE); 	// TODO: ARREGLAR ESTO
@@ -46,6 +46,7 @@ int main(int argc, char * argv[])
 	create_shm(&shm_data);
 	create_semaphore(&semaphore_read);
 	create_semaphore(&semaphore_close);
+	
 	sem_post(semaphore_close.addr);	
 
 	// Creating pipes for slaves and adding them to the select set
