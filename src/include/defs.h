@@ -3,6 +3,7 @@
 
 /* defines */
 // Error codes
+
 #define ERROR_CREATING_SLAVE_PIPES 1
 #define ERROR_CREATING_SLAVE 2
 #define ERROR_CLOSING_SLAVE_PIPES 3
@@ -29,6 +30,10 @@
 #define NO_FILES_FOUND 24
 #define ERROR_CREATING_FILE 25
 #define ERROR_CLOSING_FILE 26
+#define ERROR_CREATING_PIPES 27
+#define ERROR_UNLINKING_SEM 28
+#define ERROR_CLOSING_FD 29
+#define ERROR_DUP2 30
 
 // Constants
 #define MD5_SIZE 32

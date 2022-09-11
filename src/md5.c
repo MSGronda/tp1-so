@@ -1,5 +1,5 @@
-#include "defs.h"
-#include "resource_manager.h"
+
+#include "./include/md5.h"
 
 /* CONSTANTS */
 #define FILES_PER_SLAVE 2
@@ -56,19 +56,19 @@ int main(int argc, char * argv[])
 	slave_info slaves[num_slaves];
 	fd_set fd_read, fd_backup_read;
 
-	FD_ZERO(fd_read);
+	FD_ZERO(&fd_read);
 
 	for(int i=0; i < num_slaves; i++){
-		create_pipe(&slaves[i].app_to_slave);
-		create_pipe(&slaves[i].slave_to_app);
+		create_pipe(slaves[i].app_to_slave);
+		create_pipe(slaves[i].slave_to_app);
 		
-		FD_SET(slaves[i].slave_to_app[READ], fd_read);
+		FD_SET(slaves[i].slave_to_app[READ], &fd_read);
 	}
-	backup_read_fd = read_fd;
+	fd_backup_read = fd_read;
 
 	// Create file for output
 	FILE * output;
-	create_file("respueta.txt", "w", output);
+	create_file("respuesta.txt", "w", output);
 
 	/* --- Broadcast for VISTA process --- */
 	// Turning off print buffering
@@ -96,8 +96,9 @@ int main(int argc, char * argv[])
 
     	/* --- APP process is running --- */
 		default:
+			; 
 			/* --- Creation of local variables --- */
-			char ans[MD5_SIZE + 1]= {0};
+			char ans[MD5_SIZE + 1] = { 0 };
 			int curr_files_sent = 1, curr_files_read = 0;	// Ignore first file bc it is the executable's name
 			hash_info hash_data;
 
@@ -117,14 +118,14 @@ int main(int argc, char * argv[])
 
 			/* --- File data is received from subslave process --- */
 			while(curr_files_read < num_files) {
-				if(select(FD_SETSIZE, &read_fd, NULL, NULL, NULL) == -1) {
+				if(select(FD_SETSIZE, &fd_read, NULL, NULL, NULL) == -1) {
 					perror("Select in app");
 					exit(ERROR_SELECT_APP);
 				}
 
 				for(int i = 0; i < num_slaves && curr_files_read < num_files; i++) {
 					// Select notified that this pipe has something in it
-					if(FD_ISSET(slaves[i].slave_to_app[READ], &read_fd)) {
+					if(FD_ISSET(slaves[i].slave_to_app[READ], &fd_read)) {
 						
 						if(read(slaves[i].slave_to_app[READ], ans, MD5_SIZE*sizeof(char)) == -1) {
 							perror("Read in app");
@@ -132,10 +133,10 @@ int main(int argc, char * argv[])
 						}
 
 						// Complete hash_info fields
-						hash_data.pid = pid;
+						hash_data.pid = slaves[i].pid;
 						strcpy(hash_data.hash, ans);
-						strcpy(hash_data.file_name, prev_file_name);  
-						hash_data.files_left = num_files - curr_files_shm;
+						strcpy(hash_data.file_name, slaves[i].prev_file_name);  
+						hash_data.files_left = num_files - curr_files_read;
 
 						write_to_shm(shm_data.fd, semaphore_read.addr, &hash_data, curr_files_read);
 						curr_files_read++;
@@ -172,8 +173,8 @@ int main(int argc, char * argv[])
 			close_semaphore(&semaphore_close);
 
 			unlink_shm(shm_data.name);
-			unlink_semaphore(sem_data.name);
-			unlink_semaphore(sem_data.name);
+			unlink_semaphore(semaphore_read.name);
+			unlink_semaphore(semaphore_close.name);
 			break;
 	}
 
@@ -200,16 +201,16 @@ int slave(int * app_to_slave, int * slave_to_app)
 	// TODO: cerrar todos los fd que no usamos
 
 	// Read end of pipe between app and slave
-	FD_ZERO(app_to_slave_set[NORMAL]);
-	FD_SET(app_to_slave[READ], app_to_slave_set[NORMAL]);
+	FD_ZERO(&app_to_slave_set[NORMAL]);
+	FD_SET(app_to_slave[READ], &app_to_slave_set[NORMAL]);
 	app_to_slave_set[BACKUP] = app_to_slave_set[NORMAL];
 
 	create_pipe(subslave.fd_pipe);
 	redirect_fd(subslave.fd_pipe[READ], 0);
 	redirect_fd(subslave.fd_pipe[WRITE], 1);
 
-	FD_ZERO(subslave.set[NORMAL]);
-	FD_SET(0, subslave.set[NORMAL]);
+	FD_ZERO(&subslave.set[NORMAL]);
+	FD_SET(0, &subslave.set[NORMAL]);
 	subslave.set[BACKUP] = subslave.set[NORMAL];
 
 	while(!finished) {
@@ -219,7 +220,7 @@ int slave(int * app_to_slave, int * slave_to_app)
 		}
 
 		app_to_slave_set[NORMAL] = app_to_slave_set[BACKUP];		// Backup to previous state
-		if(read(slaves[i].slave_to_app[READ], &file_name, sizeof(char *)) == -1) {
+		if(read(app_to_slave[READ], &file_name, sizeof(char *)) == -1) {
 			perror("Reading answer from subslave.");
 			exit(ERROR_SELECT_APP_TO_SLAVE);
 		}
@@ -285,7 +286,7 @@ void write_to_shm(int fd, sem_t * addr, hash_info * hash_data, int curr_files_sh
 {
 	//TODO: chequeo de errores
 
-	pwrite(shm->fd, hash_data, sizeof(hash_data), curr_files_shm * sizeof(hash_info));
+	pwrite(fd, hash_data, sizeof(hash_data), curr_files_shm * sizeof(hash_info));
 
 	sem_post(addr);
 }
