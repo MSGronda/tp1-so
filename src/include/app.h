@@ -1,11 +1,13 @@
 #ifndef _APP_H_
 #define _APP_H_
 
+
 #define _POSIX_SOURCE
 #define _BSD_SOURCE 
 #define _XOPEN_SOURCE 501
 
 #include "defs.h"
+#include "errors.h"
 #include "resource_manager.h"
 #include "slave.h"
 
@@ -24,6 +26,15 @@
 #include <semaphore.h>
 
 
+/*
+ * << exit_handler >>
+ * ----------------------------------------------------------------------
+ * Description: Frees memory before exitting, this function is then passed
+ * to on_exit(), that´s why it has [code] and [arr].
+ * ----------------------------------------------------------------------
+ * Receives: --
+ * Returns:--
+ */
 void exit_handler(int code, void * arr);
 
 
@@ -33,7 +44,7 @@ void exit_handler(int code, void * arr);
  * Description: Writes the * src recieved on the fd provided.
  *              Checks for possible error during write().
  * ----------------------------------------------------------------------
- * Recieves: 
+ * Receives: 
  *      [fd] = file descriptor to write
  *      [src] = Pointer to the string to be written
  * Returns:--
@@ -46,7 +57,7 @@ void send_file(int fd, char ** src);
  * Description: Writes a [hash_data] struct the shm at a given offset. 
  *              Signals the semaphore recieved after writing.
  * ----------------------------------------------------------------------
- * Recieves: 
+ * Receives: 
  *      [fd] = file descriptor of the shm
  *      [addr] = semaphore address
  *      [hash_data] = struct containing md5 hash info of a given file
@@ -60,7 +71,7 @@ void write_to_shm(int fd, sem_t * addr, hash_info * hash_data, int curr_files_sh
  * ----------------------------------------------------------------------
  * Description: Checks is a provided path is a regular file
  * ----------------------------------------------------------------------
- * Recieves: 
+ * Receives: 
  *      [path] = path to a given file
  * Returns:
  *      1 in case it is a regular file

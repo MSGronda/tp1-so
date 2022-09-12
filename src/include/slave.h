@@ -2,6 +2,7 @@
 #define _SLAVE_H_
 
 #include "defs.h"
+#include "errors.h"
 #include "resource_manager.h"
 
 #include <signal.h>
@@ -20,7 +21,7 @@
  *              It calculates the md5 of a recieved file (app_to_slave)
  *              Returns the result through the other pipe (slave_to_app)
  * ----------------------------------------------------------------------
- * Recieves: 
+ * Receives: 
  *      [app_to_slave] = Array containg the fd of the (App -> Slave) pipe
  *      [slave_to_app] = Array containg the fd of the (App -> Slave) pipe
  * Returns:

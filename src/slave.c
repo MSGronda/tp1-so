@@ -4,7 +4,7 @@
 #define BACKUP 1
 
 // Contains information of pipes from subslave to slave
-typedef struct subslave_info{
+typedef struct subslave_info {
 	int fd_pipe[2];
 	fd_set set[2];
 } subslave_info;

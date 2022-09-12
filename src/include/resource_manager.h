@@ -1,9 +1,11 @@
 #ifndef _RESOURCE_MANAGER_H_
 #define _RESOURCE_MANAGER_H_
 
+
 #define _BSD_SOURCE
 
 #include "defs.h"
+#include "errors.h"
 #include <fcntl.h>           /* For O_* constants */
 #include <semaphore.h>
 #include <stdio.h>
@@ -14,7 +16,6 @@
 #include <unistd.h>
 
 
-/* --- STRUCTS --- */
 typedef struct shm_info {
 	char * name;
 	int fd;
@@ -27,7 +28,6 @@ typedef struct sem_info {
 } sem_info;
 
 
-/* --- PROTOTYPES --- */
 /*
  * << create_semaphore >>
  * ----------------------------------------------------------------------

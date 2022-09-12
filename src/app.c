@@ -9,6 +9,7 @@
 
 #define SLEEP_TIME 2
 
+/* --- STRUCT --- */
 typedef struct slave_info {
 	int app_to_slave[2];
 	int slave_to_app[2];
@@ -16,6 +17,7 @@ typedef struct slave_info {
 
 	char * prev_file_name;
 } slave_info;
+
 
 int main(int argc, char * argv[])
 {
@@ -189,7 +191,8 @@ int main(int argc, char * argv[])
 	return 0;
 }
 
-void exit_handler(int code, void * arr){
+void exit_handler(int code, void * arr)
+{
 	// Destroy shared resources
 	unlink_shm(SHM_NAME);
 	unlink_semaphore(SEM_READ_NAME);

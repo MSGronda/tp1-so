@@ -1,10 +1,10 @@
 #ifndef _VISTA_H_
 #define _VISTA_H_
 
+
 #define _POSIX_SOURCE
 #define _BSD_SOURCE 
 #define _XOPEN_SOURCE 501
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,6 +20,7 @@
 #include <limits.h>
 
 #include "resource_manager.h"
+#include "errors.h"
 #include "defs.h"
 
 #endif
