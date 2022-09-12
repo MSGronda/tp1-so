@@ -18,9 +18,9 @@ int main(int argc, char * argv[])
 		fgets(sem_read_name, NAME_MAX, stdin);
 		fgets(sem_close_name, NAME_MAX, stdin);
 
-		shm_name[strlen(shm_name) -1] = 0;
-		sem_read_name[strlen(sem_read_name) -1] = 0;
-		sem_close_name[strlen(sem_close_name) -1] = 0;
+		shm_name[strlen(shm_name)-1] = 0;
+		sem_read_name[strlen(sem_read_name)-1] = 0;
+		sem_close_name[strlen(sem_close_name)-1] = 0;
 	}
 
 	shm_data.name = shm_name;
@@ -49,7 +49,7 @@ int main(int argc, char * argv[])
 			exit(ERROR_READING_SHM);
 		}
 		
-		printf("\n -> File: %s Md5: %s Pid: %d\n",hash_data.file_name, hash_data.hash, hash_data.pid);
+		printf("\n -> File: %s | Md5: %s | Pid: %d\n",hash_data.file_name, hash_data.hash, hash_data.pid);
 
 		if(hash_data.files_left <= 1)
 			finished = 1;	
