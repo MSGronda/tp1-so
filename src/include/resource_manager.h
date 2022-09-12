@@ -28,7 +28,7 @@ typedef struct sem_info {
 
 
 /* PROTOTYPES */
-void create_semaphore(sem_info * sem_data);
+void * create_semaphore(sem_info * sem_data);
 
 void open_semaphore(sem_info * sem_data);
 

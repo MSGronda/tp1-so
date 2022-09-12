@@ -1,12 +1,9 @@
 #include "./include/resource_manager.h"
 #include "./include/defs.h"
 
-void create_semaphore(sem_info * sem_data)
+void * create_semaphore(sem_info * sem_data)
 {
-	if((sem_data->addr = sem_open(sem_data->name,  O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0)) == SEM_FAILED) {
-		perror("Creating semaphore");
-		exit(ERROR_CREATING_SEM);
-	}
+	return (sem_data->addr = sem_open(sem_data->name,  O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0));
 }
 
 void open_semaphore(sem_info * sem_data)

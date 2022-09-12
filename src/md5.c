@@ -6,7 +6,7 @@
 
 #define SHM_NAME "md5_shm"
 #define SEM_READ_NAME "md5_read_sem"
-#define SEM_CLOSE_NAME "md5_shm_sem"
+#define SEM_CLOSE_NAME "md5_close_sem"
 
 
 typedef struct slave_info {
@@ -16,6 +16,14 @@ typedef struct slave_info {
 
 	char * prev_file_name;
 } slave_info;
+
+// SE CORRE SIEMPRE !!!!!!!! EN TODOS LOS CASOS
+void exit_handler(int code, void * arr){
+	unlink_shm(SHM_NAME);
+	unlink_semaphore(SEM_READ_NAME);
+	unlink_semaphore(SEM_CLOSE_NAME);
+}
+
 
 
 int main(int argc, char * argv[])
@@ -35,20 +43,6 @@ int main(int argc, char * argv[])
 	/* --- Creation of local variables and necessary resources --- */
 	int num_slaves = ceil((double) num_files / FILES_PER_SLAVE); 	// TODO: ARREGLAR ESTO
 
-	//	Create shared memory and semaphore
-	shm_info shm_data;
-	sem_info semaphore_read, semaphore_close;
-
-	shm_data.name = SHM_NAME;
-	semaphore_read.name = SEM_READ_NAME;
-	semaphore_close.name = SEM_CLOSE_NAME;
-
-	create_shm(&shm_data);
-	create_semaphore(&semaphore_read);
-	create_semaphore(&semaphore_close);
-	
-	sem_post(semaphore_close.addr);	
-
 	// Creating pipes for slaves and adding them to the select set
 	slave_info slaves[num_slaves];
 	fd_set fd_read, fd_backup_read;
@@ -65,6 +59,34 @@ int main(int argc, char * argv[])
 
 	// Create file for output
 	FILE * output = create_file("respuesta.txt", "w");
+
+
+	//	Create shared memory and semaphore
+	shm_info shm_data;
+	sem_info semaphore_read, semaphore_close;
+
+	shm_data.name = SHM_NAME;
+	semaphore_read.name = SEM_READ_NAME;
+	semaphore_close.name = SEM_CLOSE_NAME;
+
+	create_shm(&shm_data);
+	void * resp ;
+	if((resp = create_semaphore(&semaphore_read)) == SEM_FAILED){
+		unlink_shm(shm_data.name);
+		perror("Creating semaphore");
+		exit(ERROR_CREATING_SEM);
+	}
+
+	if((resp = create_semaphore(&semaphore_close)) == SEM_FAILED){
+		unlink_shm(shm_data.name);
+		unlink_semaphore(semaphore_read.name);
+		perror("Creating semaphore");
+		exit(ERROR_CREATING_SEM);
+	}
+
+	
+	sem_post(semaphore_close.addr);	
+
 
 	/* --- Broadcast for VISTA process --- */
 	// Turning off print buffering
@@ -91,8 +113,10 @@ int main(int argc, char * argv[])
 			break;
 
     	/* --- APP process is running --- */
-		default:
-			; 
+		default:; 
+
+			on_exit(exit_handler, NULL);
+
 			/* --- Creation of local variables --- */
 			char ans[MD5_SIZE + 1] = { 0 };
 			int curr_files_sent = 0, curr_files_read = 0;	// Ignore first file bc it is the executable's name
@@ -166,9 +190,9 @@ int main(int argc, char * argv[])
 
 			close_semaphore(&semaphore_close);
 
-			unlink_shm(shm_data.name);
-			unlink_semaphore(semaphore_read.name);
-			unlink_semaphore(semaphore_close.name);
+			// unlink_shm(shm_data.name);
+			// unlink_semaphore(semaphore_read.name);
+			// unlink_semaphore(semaphore_close.name);
 			break;
 	}
 
