@@ -30,8 +30,7 @@ void unlink_semaphore(char * sem_name)
 	}
 }
 
-// por ahora tiene esos flags porque son los que se necesitan
-// estaria bueno hacerla mas general :)
+
 void create_shm(shm_info * shm_data) 
 {
 	if((shm_data->fd = shm_open(shm_data->name, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR)) == -1) {
@@ -50,8 +49,7 @@ void create_shm(shm_info * shm_data)
 	}
 }
 
-// por ahora tiene esos flags porque son los que se necesitan
-// estaria bueno hacerla mas general :)
+
 void open_shm(shm_info * shm_data) 
 {
 	if((shm_data->fd = shm_open(shm_data->name, O_RDONLY, S_IRUSR)) == -1) {
@@ -104,7 +102,7 @@ void close_fd(int fd)
 }
 
 
-FILE * create_file( char * pathname,  char * mode)
+FILE * create_file(char * pathname,  char * mode)
 {
 	FILE * out;
 	if((out = fopen("respuesta.txt", "w")) == NULL) {
