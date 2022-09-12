@@ -18,9 +18,14 @@ int main(int argc, char * argv[])
 		fgets(sem_read_name, NAME_MAX, stdin);
 		fgets(sem_close_name, NAME_MAX, stdin);
 
-		shm_name[strlen(shm_name)-1] = 0;
-		sem_read_name[strlen(sem_read_name)-1] = 0;
-		sem_close_name[strlen(sem_close_name)-1] = 0;
+		int length_shm, length_read, length_close;
+		CHECK_ERROR(length_shm = strlen(shm_name), 0, "String invalido en Vista", ERROR_INVALID_STRING)		
+		CHECK_ERROR(length_read = strlen(sem_read_name), 0, "String invalido en Vista", ERROR_INVALID_STRING)		
+		CHECK_ERROR(length_close= strlen(sem_close_name), 0, "String invalido en Vista", ERROR_INVALID_STRING)		
+
+		shm_name[length_shm - 1] = 0;
+		sem_read_name[length_read - 1] = 0;
+		sem_close_name[length_close - 1] = 0;
 	}
 
 	shm_data.name = shm_name;

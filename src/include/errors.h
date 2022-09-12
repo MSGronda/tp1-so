@@ -35,6 +35,7 @@
 #define NO_ARGS 31
 #define ERROR_READING_SHM 32
 #define ERROR_WRITING_SHM 33
+#define ERROR_INVALID_STRING 34
 
 
 #define CHECK_ERROR(left_val, right_val, msg, exit_val)	if( (left_val) == (right_val) ) { 	\
