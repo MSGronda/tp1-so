@@ -8,9 +8,9 @@ int main(int argc, char * argv[])
 	hash_info hash_data;
 
 	if(argc >= 4) { // arguments are sent via function arguments
-		strncpy(shm_name,argv[1], NAME_MAX);
-		strncpy(sem_read_name,argv[2], NAME_MAX);
-		strncpy(sem_read_name,argv[3], NAME_MAX);
+		strncpy(shm_name, argv[1], NAME_MAX);
+		strncpy(sem_read_name, argv[2], NAME_MAX);
+		strncpy(sem_close_name, argv[3], NAME_MAX);
 	}
 	else //arguments are sent via stdin
 	{
@@ -30,8 +30,6 @@ int main(int argc, char * argv[])
 	open_shm(&shm_data);
 	open_semaphore(&semaphore_read);
 	open_semaphore(&semaphore_close);
-
-	printf("abrimos todo\n");
 
 	// Signal to app that resources are being read so they should not be unlinked
 	sem_wait(semaphore_close.addr);

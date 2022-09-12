@@ -7,6 +7,7 @@
 #define SEM_READ_NAME "md5_read_sem"
 #define SEM_CLOSE_NAME "md5_close_sem"
 
+#define SLEEP_TIME 2
 
 typedef struct slave_info {
 	int app_to_slave[2];
@@ -87,7 +88,7 @@ int main(int argc, char * argv[])
 	printf("%s\n", SEM_READ_NAME); 		// Broadcast read shared memory sempaphore
 	printf("%s\n", SEM_CLOSE_NAME);		// Broadcast close shared memory sempaphore
 
-	sleep(2);
+	sleep(SLEEP_TIME);
 
 	/* --- Creating slaves --- */
 	int curr_slave, curr_id = 1;
