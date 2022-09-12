@@ -31,6 +31,8 @@ int main(int argc, char * argv[])
 	open_semaphore(&semaphore_read);
 	open_semaphore(&semaphore_close);
 
+	printf("abrimos todo\n");
+
 	// Signal to app that resources are being read so they should not be unlinked
 	sem_wait(semaphore_close.addr);
 
@@ -46,10 +48,10 @@ int main(int argc, char * argv[])
 		if(pread(shm_data.fd, &hash_data, sizeof(hash_info), i * sizeof(hash_info)) == -1){
 			sem_post(semaphore_close.addr);		// Allow app to free resources
 			perror("Reading shared memory");
-			exit(1238128381);
+			exit(ERROR_READING_SHM);
 		}
 		
-		printf("\nFile: %s Md5: %s Pid: %d\n",hash_data.file_name, hash_data.hash, hash_data.pid);
+		printf("\n -> File: %s Md5: %s Pid: %d\n",hash_data.file_name, hash_data.hash, hash_data.pid);
 
 		if(hash_data.files_left <= 1)
 			finished = 1;	

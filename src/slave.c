@@ -25,8 +25,6 @@ int slave(int * app_to_slave, int * slave_to_app)
 	/* --- Closing useless pipes and creating new ones --- */
 	close_fd(app_to_slave[WRITE]);
 	close_fd(slave_to_app[READ]);
-	
-	// TODO: cerrar todos los fd que no usamos
 
 	// Read end of pipe between app and slave
 	FD_ZERO(&(app_to_slave_set[NORMAL]));

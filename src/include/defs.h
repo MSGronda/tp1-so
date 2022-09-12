@@ -34,6 +34,8 @@
 #define ERROR_UNLINKING_SEM 28
 #define ERROR_CLOSING_FD 29
 #define ERROR_DUP2 30
+#define NO_ARGS 31
+#define ERROR_READING_SHM 32
 
 // Constants
 #define MD5_SIZE 32

@@ -16,19 +16,11 @@ typedef struct slave_info {
 	char * prev_file_name;
 } slave_info;
 
-// SE CORRE SIEMPRE !!!!!!!! EN TODOS LOS CASOS
-void exit_handler(int code, void * arr){
-	unlink_shm(SHM_NAME);
-	unlink_semaphore(SEM_READ_NAME);
-	unlink_semaphore(SEM_CLOSE_NAME);
-}
-
-
-
 int main(int argc, char * argv[])
 {
 	char * files[argc];
 
+	// We only keep arguments that are files, NOT directories
 	int num_files=0;
 	for(int i=1; i<argc; i++){
 		if(is_regular_file(argv[i])){
@@ -114,6 +106,7 @@ int main(int argc, char * argv[])
     	/* --- APP process is running --- */
 		default:; 
 
+			// App will exit freeing resources during normal execution and if error is encountered
 			on_exit(exit_handler, NULL);
 
 			/* --- Creation of local variables --- */
@@ -189,13 +182,17 @@ int main(int argc, char * argv[])
 
 			close_semaphore(&semaphore_close);
 
-			// unlink_shm(shm_data.name);
-			// unlink_semaphore(semaphore_read.name);
-			// unlink_semaphore(semaphore_close.name);
 			break;
 	}
 
 	return 0;
+}
+
+void exit_handler(int code, void * arr){
+	// Destroy shared resources
+	unlink_shm(SHM_NAME);
+	unlink_semaphore(SEM_READ_NAME);
+	unlink_semaphore(SEM_CLOSE_NAME);
 }
 
 int is_regular_file(const char *path)
@@ -205,8 +202,6 @@ int is_regular_file(const char *path)
     return S_ISREG(path_stat.st_mode);
 }
 
-
-// No se que onda los *
 void send_file(int fd, char ** src)
 {
 	if(write(fd, src, sizeof(char *)) == -1) {
@@ -215,7 +210,6 @@ void send_file(int fd, char ** src)
 	}
 }
 
-// No se que onda los *
 void write_to_shm(int fd, sem_t * addr, hash_info * hash_data, int curr_files_shm) 
 {
 	//TODO: chequeo de errores

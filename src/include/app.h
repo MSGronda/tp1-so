@@ -23,6 +23,10 @@
 #include <string.h>
 #include <semaphore.h>
 
+
+void exit_handler(int code, void * arr);
+
+
 /*
  * << send_file >>
  * ----------------------------------------------------------------------
