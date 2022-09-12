@@ -1,5 +1,4 @@
-
-#include "./include/md5.h"
+#include "./include/app.h"
 
 /* CONSTANTS */
 #define FILES_PER_SLAVE 2

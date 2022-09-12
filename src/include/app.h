@@ -1,5 +1,5 @@
-#ifndef _MD5_H_
-#define _MD5_H_
+#ifndef _APP_H_
+#define _APP_H_
 
 #define _POSIX_SOURCE
 #define _BSD_SOURCE 
@@ -7,6 +7,7 @@
 
 #include "defs.h"
 #include "resource_manager.h"
+#include "slave.h"
 
 #include <math.h>
 #include <signal.h>
@@ -22,7 +23,7 @@
 #include <string.h>
 #include <semaphore.h>
 
-int slave(int * app_to_slave, int * slave_to_app);
+
 void redirect_fd(int oldfd, int newfd);
 void send_file(int fd, char ** src);
 void write_to_shm(int fd, sem_t * addr, hash_info * hash_data, int curr_files_shm); 

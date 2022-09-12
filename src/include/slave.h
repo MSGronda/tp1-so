@@ -13,4 +13,6 @@
 #include <sys/stat.h>
 #include <semaphore.h>
 
+int slave(int * app_to_slave, int * slave_to_app);
+
 #endif
