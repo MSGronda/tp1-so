@@ -1,25 +1,25 @@
 include Makefile.inc
 
-VISTA_SOURCES=vista.c
-APP_SOURCES=app.c
-SHARED_SOURCES=resource_manager.c
-APP_OUTPUT_FILE=./../md5
-VISTA_OUTPUT_FILE=./../vista
-SLAVE_SOURCES=slave.c
-SLAVE_OUTPUT_FILE=slave.o
+SOURCES_RESOURCE=$(wildcard resource_manager/*.c)
+SOURCES_VISTA=vista.c
+SOURCES_APP=app.c
+SOURCES_SLAVE=slave.c
+
+OUT_APP=./../md5
+OUT_VISTA=./../vista
+
 
 all: vista app
 
 vista:
-	$(GCC) $(GCCFLAGS) $(VISTA_SOURCES) $(SHARED_SOURCES) -o $(VISTA_OUTPUT_FILE)
-
-slave:
-	$(GCC) $(GCCFLAGS) -c $(SLAVE_SOURCES) -o $(SLAVE_OUTPUT_FILE)
+	@$(GCC) $(GCCFLAGS) $(SOURCES_VISTA) $(SOURCES_RESOURCE) -o $(OUT_VISTA)
+	@echo "Successfully created vista"
 
 app: slave
-	$(GCC) $(GCCFLAGS) $(APP_SOURCES) $(SHARED_SOURCES) $(SLAVE_OUTPUT_FILE) -o $(APP_OUTPUT_FILE)
+	@$(GCC) $(GCCFLAGS) $(SOURCES_APP) $(SOURCES_RESOURCE) $(SOURCES_SLAVE) -o $(OUT_APP)
+	@echo "Successfully created md5"
 
 clean:
-	rm -f $(VISTA_OUTPUT_FILE) $(APP_OUTPUT_FILE) $(SLAVE_OUTPUT_FILE)
+	rm -f $(OUT_APP) $(OUT_VISTA) 
 
-.PHONY: all clean app vista slave
+.PHONY: all clean app vista slave res_manager

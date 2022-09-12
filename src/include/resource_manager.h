@@ -6,6 +6,7 @@
 
 #include "defs.h"
 #include "errors.h"
+
 #include <fcntl.h>           /* For O_* constants */
 #include <semaphore.h>
 #include <stdio.h>
