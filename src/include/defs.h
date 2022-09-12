@@ -36,6 +36,7 @@
 #define ERROR_DUP2 30
 #define NO_ARGS 31
 #define ERROR_READING_SHM 32
+#define ERROR_WRITING_SHM 33
 
 // Constants
 #define MD5_SIZE 32

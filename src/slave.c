@@ -1,13 +1,13 @@
 #include "./include/slave.h"
 
+#define NORMAL 0
+#define BACKUP 1
+
 // Contains information of pipes from subslave to slave
 typedef struct subslave_info{
 	int fd_pipe[2];
 	fd_set set[2];
 } subslave_info;
-
-#define NORMAL 0
-#define BACKUP 1
 
 
 int slave(int * app_to_slave, int * slave_to_app)

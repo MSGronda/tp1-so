@@ -213,9 +213,10 @@ void send_file(int fd, char ** src)
 
 void write_to_shm(int fd, sem_t * addr, hash_info * hash_data, int curr_files_shm) 
 {
-	//TODO: chequeo de errores
-
-	pwrite(fd, hash_data, sizeof(hash_info), curr_files_shm * sizeof(hash_info));
+	if(pwrite(fd, hash_data, sizeof(hash_info), curr_files_shm * sizeof(hash_info)) == -1){
+		perror("Writing to shm");
+		exit(ERROR_WRITING_PIPE);
+	}
 
 	sem_post(addr);
 }
