@@ -1,4 +1,8 @@
 # TP1 - Sistemas Operativos
+## Team Members
+- Nicolás Matias Margenat (_n° 62028_)
+- Manuel Esteban Dithurbide (_n° 62057_)
+- Marcos Gronda (_n° 62067_)
 
 ## Requirements
 Programs have to be compiled using the chair´s docker container:
