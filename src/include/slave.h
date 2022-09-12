@@ -22,7 +22,7 @@
  * ----------------------------------------------------------------------
  * Recieves: 
  *      [app_to_slave] = Array containg the fd of the (App -> Slave) pipe
- *      [slave_to_a] = Array containg the fd of the (App -> Slave) pipe
+ *      [slave_to_app] = Array containg the fd of the (App -> Slave) pipe
  * Returns:
  *      0 if no errors occur
  */
