@@ -1,3 +1,3 @@
 GCC=gcc 
 
-GCCFLAGS=-Wall -std=c99 -lm -lrt -pthread
+GCCFLAGS=-Wall -std=c99 -lrt -pthread

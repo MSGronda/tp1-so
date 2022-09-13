@@ -1,5 +1,15 @@
 #include "./../include/resource_manager.h"
 
+
+void write_to_shm(int fd, void * data, size_t length, int pos) 
+{
+	if(pwrite(fd, data, length, pos * length) == -1){
+		perror("Writing to shm");
+		exit(ERROR_WRITING_PIPE);
+	}
+}
+
+
 void create_shm(shm_info * shm_data) 
 {
 	if((shm_data->fd = shm_open(shm_data->name, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR)) == -1) {

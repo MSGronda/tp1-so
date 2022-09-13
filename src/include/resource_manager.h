@@ -3,6 +3,7 @@
 
 
 #define _BSD_SOURCE
+#define _XOPEN_SOURCE 501
 
 #include "defs.h"
 #include "errors.h"
@@ -27,7 +28,36 @@ typedef struct sem_info {
 	char * name;
 	sem_t * addr;
 } sem_info;
+/*
+ * << send_to_file >>
+ * ----------------------------------------------------------------------
+ * Description: Writes the * src recieved on the fd provided.
+ *              Checks for possible error during write().
+ * ----------------------------------------------------------------------
+ * Receives: 
+ *      [fd] = file descriptor to write
+ *      [data] = Data to be written
+ *      [length] = Size of data to be written
+ * Returns:--
+ */
 
+void send_to_fd(int fd, void * data, size_t length);
+
+
+/*
+ * << write_to_shm >>
+ * ----------------------------------------------------------------------
+ * Description: Writes a [hash_data] struct the shm at a given offset. 
+ *              Signals the semaphore recieved after writing.
+ * ----------------------------------------------------------------------
+ * Receives: 
+ *      [fd] = file descriptor of the shm
+ *      [data] = data to be written 
+ *      [length] = size of data to be written
+ *      [pos] = position to be written
+ * Returns:--
+ */
+void write_to_shm(int fd, void * data, size_t length, int pos);
 
 /*
  * << create_semaphore >>

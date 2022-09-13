@@ -17,3 +17,12 @@ void close_file(FILE * stream)
 		exit(ERROR_CLOSING_FILE);
 	}
 }
+
+
+void send_file(int fd, void * data, size_t length)
+{
+	if(write(fd, data, length) == -1) {
+		perror("Writing to slave");
+		exit(ERROR_WRITING_PIPE);
+	}
+}

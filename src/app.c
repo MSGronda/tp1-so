@@ -35,7 +35,7 @@ int main(int argc, char * argv[])
 	if(argc <= 1 || num_files == 0) return NO_FILES_FOUND;
 
 	/* --- Creation of local variables and necessary resources --- */
-	int num_slaves = ceil((double) num_files / FILES_PER_SLAVE); 	// TODO: ARREGLAR ESTO
+	int num_slaves =  num_files / FILES_PER_SLAVE + 1; 	
 
 	// Creating pipes for slaves and adding them to the select set
 	slave_info slaves[num_slaves];
@@ -110,7 +110,7 @@ int main(int argc, char * argv[])
 		default:; 
 
 			// App will exit freeing resources during normal execution and if error is encountered
-			on_exit(exit_handler, NULL);
+			on_exit(exit_handler, output);
 
 			/* --- Creation of local variables --- */
 			char ans[MD5_SIZE + 1] = { 0 };
@@ -125,7 +125,7 @@ int main(int argc, char * argv[])
 
 	        /* --- Initial distribution of files to slaves --- */
 			for(int i = 0; curr_files_sent < num_slaves; i++) {
-				send_file(slaves[i].app_to_slave[WRITE], &(files[curr_files_sent]));
+				send_to_fd(slaves[i].app_to_slave[WRITE], &(files[curr_files_sent]), sizeof(char *));
 				slaves[i].prev_file_name = files[curr_files_sent];
 				curr_files_sent++;
 				
@@ -153,14 +153,15 @@ int main(int argc, char * argv[])
 						strcpy(hash_data.file_name, slaves[i].prev_file_name);  
 						hash_data.files_left = num_files - curr_files_read;
 
-						write_to_shm(shm_data.fd, semaphore_read.addr, &hash_data, curr_files_read);
+						write_to_shm(shm_data.fd, &hash_data, sizeof(hash_info), curr_files_read);
+						sem_post(semaphore_read.addr);
 						curr_files_read++;
 
 						// Write hash to file
 						fprintf(output, "\nFile: %s Md5: %s Pid: %d\n", hash_data.file_name, hash_data.hash, hash_data.pid);
 
 						if(curr_files_sent < num_files) {
-							send_file(slaves[i].app_to_slave[WRITE], &(files[curr_files_sent]));
+							send_to_fd(slaves[i].app_to_slave[WRITE], &(files[curr_files_sent]), sizeof(char *));
 							slaves[i].prev_file_name = files[curr_files_sent];
 							curr_files_sent++;
 						}
@@ -178,7 +179,6 @@ int main(int argc, char * argv[])
 
 			close_shm(&shm_data);
 			close_semaphore(&semaphore_read);
-			close_file(output);
 
 			// Wait until vista stops reading shared memory. If vista doesnt exist, continue.
 			sem_wait(semaphore_close.addr);
@@ -191,8 +191,11 @@ int main(int argc, char * argv[])
 	return 0;
 }
 
-void exit_handler(int code, void * arr)
+void exit_handler(int code, void * val)
 {
+	// Close file
+	close_file((FILE *)val);
+
 	// Destroy shared resources
 	unlink_shm(SHM_NAME);
 	unlink_semaphore(SEM_READ_NAME);
@@ -206,20 +209,3 @@ int is_regular_file(const char *path)
     return S_ISREG(path_stat.st_mode);
 }
 
-void send_file(int fd, char ** src)
-{
-	if(write(fd, src, sizeof(char *)) == -1) {
-		perror("Writing to slave");
-		exit(ERROR_WRITING_PIPE);
-	}
-}
-
-void write_to_shm(int fd, sem_t * addr, hash_info * hash_data, int curr_files_shm) 
-{
-	if(pwrite(fd, hash_data, sizeof(hash_info), curr_files_shm * sizeof(hash_info)) == -1){
-		perror("Writing to shm");
-		exit(ERROR_WRITING_PIPE);
-	}
-
-	sem_post(addr);
-}

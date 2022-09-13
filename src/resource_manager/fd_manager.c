@@ -23,3 +23,12 @@ void redirect_fd(int oldfd, int newfd)
 		exit(ERROR_DUP2);
 	} 
 }
+
+void send_to_fd(int fd, void * data, size_t length)
+{
+	if(write(fd, data, length) == -1) {
+		perror("Writing to slave");
+		exit(ERROR_WRITING_PIPE);
+	}
+}
+
