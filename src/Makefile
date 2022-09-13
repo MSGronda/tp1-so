@@ -1,6 +1,7 @@
 include Makefile.inc
 
 SOURCES_RESOURCE=$(wildcard resource_manager/*.c)
+SOURCES_LIBS=$(wildcard libs/*.c)
 SOURCES_VISTA=vista.c
 SOURCES_APP=app.c
 SOURCES_SLAVE=slave.c
@@ -15,11 +16,11 @@ vista:
 	@$(GCC) $(GCCFLAGS) $(SOURCES_VISTA) $(SOURCES_RESOURCE) -o $(OUT_VISTA)
 	@echo "Successfully created vista"
 
-app: slave
-	@$(GCC) $(GCCFLAGS) $(SOURCES_APP) $(SOURCES_RESOURCE) $(SOURCES_SLAVE) -o $(OUT_APP)
+app:
+	@$(GCC) $(GCCFLAGS) $(SOURCES_APP) $(SOURCES_RESOURCE) $(SOURCES_LIBS) $(SOURCES_SLAVE) -o $(OUT_APP)
 	@echo "Successfully created md5"
 
 clean:
 	rm -f $(OUT_APP) $(OUT_VISTA) 
 
-.PHONY: all clean app vista slave res_manager
+.PHONY: all clean app vista

@@ -158,7 +158,7 @@ int main(int argc, char * argv[])
 						curr_files_read++;
 
 						// Write hash to file
-						fprintf(output, "\nFile: %s Md5: %s Pid: %d\n", hash_data.file_name, hash_data.hash, hash_data.pid);
+						fprintf(output, "\n File: %s | Md5: %s | Pid: %d\n", hash_data.file_name, hash_data.hash, hash_data.pid);
 
 						if(curr_files_sent < num_files) {
 							send_to_fd(slaves[i].app_to_slave[WRITE], &(files[curr_files_sent]), sizeof(char *));
@@ -201,11 +201,3 @@ void exit_handler(int code, void * val)
 	unlink_semaphore(SEM_READ_NAME);
 	unlink_semaphore(SEM_CLOSE_NAME);
 }
-
-int is_regular_file(const char *path)
-{
-    struct stat path_stat;
-    stat(path, &path_stat);
-    return S_ISREG(path_stat.st_mode);
-}
-
