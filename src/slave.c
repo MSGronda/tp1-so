@@ -20,7 +20,7 @@ int slave(int * app_to_slave, int * slave_to_app)
 	char * args[] = { "md5sum", NULL, NULL };	// 2nd arg will be path received from APP
 	int finished = 0;					
 	char * file_name;
-	char output[MD5_SIZE + 1]= {0};		// calculated hash for file 
+	char output[MD5_SIZE + 1] = {0};		// calculated hash for file 
 
 	/* --- Closing useless pipes and creating new ones --- */
 	close_fd(app_to_slave[WRITE]);

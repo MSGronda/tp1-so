@@ -22,7 +22,9 @@ void redirect_fd(int oldfd, int newfd)
 		perror("Dup2");
 		exit(ERROR_DUP2);
 	} 
+	close_fd(oldfd);
 }
+
 
 void send_to_fd(int fd, void * data, size_t length)
 {

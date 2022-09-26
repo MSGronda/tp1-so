@@ -103,6 +103,18 @@ int main(int argc, char * argv[])
 	switch(curr_id) {
 		/* --- SLAVE process is running --- */
 		case 0:
+
+			for(int i=0; i < num_slaves; i++){
+				if(i != curr_slave -1){
+					close_fd(slaves[i].app_to_slave[READ]);
+					close_fd(slaves[i].slave_to_app[WRITE]);				
+					close_fd(slaves[i].app_to_slave[WRITE]);
+					close_fd(slaves[i].slave_to_app[READ]);
+				}
+			}	
+
+
+
 			slave(slaves[curr_slave - 1].app_to_slave, slaves[curr_slave - 1].slave_to_app);
 			break;
 
